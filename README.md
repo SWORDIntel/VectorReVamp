@@ -1,6 +1,6 @@
 # Unified Test Harness
 
-A framework-agnostic, vector database-driven testing harness that combines the best features from KP14 and GETMOVIN test harnesses. Works with any Python project and testing framework.
+A framework-agnostic, vector database-driven testing harness that ci devised for rapid test generation in huge programs. Works with any Python project and testing framework.
 
 ## Overview
 
