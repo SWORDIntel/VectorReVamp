@@ -3,6 +3,7 @@ LLM-Powered Test Generator
 
 Uses LLM agents to generate test vectors based on coverage gaps and code analysis.
 Framework-agnostic implementation.
+Supports Python, C, and Rust test generation.
 """
 
 import json
@@ -11,6 +12,7 @@ from typing import Dict, List, Any, Optional
 import ast
 
 from .test_vector import TestVector, TestVectorType, TestPriority
+from .language_parser import LanguageParser, Language
 
 
 class LLMTestGenerator:
@@ -30,6 +32,7 @@ class LLMTestGenerator:
         self.code_embedder = code_embedder
         self.generated_vectors: List[TestVector] = []
         self.llm_client = None
+        self.language_parser = LanguageParser()
         
         if config.llm_enabled:
             self._init_llm_client()
@@ -271,15 +274,29 @@ Return JSON format:
     
     def generate_test_code(self, vector: TestVector) -> str:
         """Generate actual test code from a test vector"""
+        # Detect language from module file
+        module_path = self.coverage_analyzer._find_module_file(vector.module_name)
+        if module_path:
+            language = self.language_parser.detect_language(module_path)
+        else:
+            language = Language.PYTHON  # Default
+        
         import_prefix = vector.framework_config.get('import_prefix', '')
         test_framework = vector.framework_config.get('test_framework', 'pytest')
         
-        if test_framework == "pytest":
-            return self._generate_pytest_code(vector, import_prefix)
-        elif test_framework == "unittest":
-            return self._generate_unittest_code(vector, import_prefix)
+        if language == Language.PYTHON:
+            if test_framework == "pytest":
+                return self._generate_pytest_code(vector, import_prefix)
+            elif test_framework == "unittest":
+                return self._generate_unittest_code(vector, import_prefix)
+            else:
+                return self._generate_pytest_code(vector, import_prefix)
+        elif language == Language.C:
+            return self._generate_c_code(vector)
+        elif language == Language.RUST:
+            return self._generate_rust_code(vector)
         else:
-            return self._generate_pytest_code(vector, import_prefix)  # Default to pytest
+            return self._generate_pytest_code(vector, import_prefix)  # Default
     
     def _generate_pytest_code(self, vector: TestVector, import_prefix: str) -> str:
         """Generate pytest test code"""
@@ -434,6 +451,195 @@ class Test{vector.vector_id.replace('_', '').title()}(unittest.TestCase):
         
         return test_code
     
+    def _generate_c_code(self, vector: TestVector) -> str:
+        """Generate C test code using Unity framework"""
+        module_name = vector.module_name
+        
+        test_code = f'''/*
+ * {vector.description}
+ *
+ * Vector ID: {vector.vector_id}
+ * Type: {vector.vector_type.value}
+ * Priority: {vector.priority.value}
+ */
+
+#include "unity.h"
+#include "{module_name}.h"
+
+void setUp(void) {{
+    // Setup before each test
+'''
+        
+        for precondition in vector.preconditions:
+            test_code += f"    // Precondition: {precondition}\n"
+        
+        if vector.setup_function:
+            test_code += f"    {vector.setup_function}();\n"
+        
+        test_code += "}\n\n"
+        
+        test_code += f"void tearDown(void) {{\n"
+        if vector.teardown_function:
+            test_code += f"    {vector.teardown_function}();\n"
+        test_code += "}\n\n"
+        
+        # Generate test function
+        test_func_name = f"test_{vector.vector_id.replace('-', '_')}"
+        test_code += f"void {test_func_name}(void) {{\n"
+        test_code += f"    /*\n"
+        test_code += f"     * {vector.description}\n"
+        test_code += f"     * Coverage targets: {', '.join(vector.coverage_targets)}\n"
+        test_code += f"     */\n\n"
+        
+        # Add inputs
+        if vector.inputs:
+            test_code += "    // Inputs\n"
+            for key, value in vector.inputs.items():
+                if isinstance(value, str):
+                    test_code += f"    const char* {key} = \"{value}\";\n"
+                elif isinstance(value, int):
+                    test_code += f"    int {key} = {value};\n"
+                elif isinstance(value, float):
+                    test_code += f"    float {key} = {value}f;\n"
+                else:
+                    test_code += f"    // {key} = {value}\n"
+        
+        # Add test execution
+        test_code += "\n    // Test execution\n"
+        if vector.coverage_targets:
+            target = vector.coverage_targets[0]
+            if '.' in target:
+                # Struct method
+                struct_name, method_name = target.split('.', 1)
+                test_code += f"    // {struct_name} obj;\n"
+                test_code += f"    // obj.{method_name}({', '.join(vector.inputs.keys()) if vector.inputs else ''});\n"
+            else:
+                # Function
+                test_code += f"    // {target}({', '.join(vector.inputs.keys()) if vector.inputs else ''});\n"
+        
+        # Add assertions
+        test_code += "\n    // Assertions\n"
+        if vector.expected_outputs:
+            for key, value in vector.expected_outputs.items():
+                if isinstance(value, (int, float)):
+                    test_code += f"    // TEST_ASSERT_EQUAL({value}, {key});\n"
+                elif isinstance(value, str):
+                    test_code += f"    // TEST_ASSERT_EQUAL_STRING(\"{value}\", {key});\n"
+                else:
+                    test_code += f"    // TEST_ASSERT_EQUAL({repr(value)}, {key});\n"
+        
+        if vector.expected_errors:
+            test_code += "\n    // Error handling\n"
+            for error in vector.expected_errors:
+                test_code += f"    // Should handle {error}\n"
+        
+        # Add postconditions
+        if vector.postconditions:
+            test_code += "\n    // Postconditions\n"
+            for postcondition in vector.postconditions:
+                test_code += f"    // Postcondition: {postcondition}\n"
+        
+        test_code += "    // TODO: Implement test\n"
+        test_code += "}\n"
+        
+        return test_code
+    
+    def _generate_rust_code(self, vector: TestVector) -> str:
+        """Generate Rust test code"""
+        module_name = vector.module_name
+        
+        test_code = f'''/*
+ * {vector.description}
+ *
+ * Vector ID: {vector.vector_id}
+ * Type: {vector.vector_type.value}
+ * Priority: {vector.priority.value}
+ */
+
+#[cfg(test)]
+mod tests {{
+    use super::*;
+    
+'''
+        
+        # Generate test function
+        test_func_name = f"test_{vector.vector_id.replace('-', '_')}"
+        test_code += f"    #[test]\n"
+        test_code += f"    fn {test_func_name}() {{\n"
+        test_code += f"        /*\n"
+        test_code += f"         * {vector.description}\n"
+        test_code += f"         * Coverage targets: {', '.join(vector.coverage_targets)}\n"
+        test_code += f"         */\n\n"
+        
+        # Add preconditions
+        for precondition in vector.preconditions:
+            test_code += f"        // Precondition: {precondition}\n"
+        
+        if vector.setup_function:
+            test_code += f"        {vector.setup_function}();\n"
+        
+        # Add inputs
+        if vector.inputs:
+            test_code += "\n        // Inputs\n"
+            for key, value in vector.inputs.items():
+                if isinstance(value, str):
+                    test_code += f"        let {key} = \"{value}\";\n"
+                elif isinstance(value, int):
+                    test_code += f"        let {key} = {value};\n"
+                elif isinstance(value, float):
+                    test_code += f"        let {key} = {value}f64;\n"
+                elif isinstance(value, bool):
+                    test_code += f"        let {key} = {str(value).lower()};\n"
+                else:
+                    test_code += f"        let {key} = {repr(value)};\n"
+        
+        # Add test execution
+        test_code += "\n        // Test execution\n"
+        if vector.coverage_targets:
+            target = vector.coverage_targets[0]
+            if '.' in target:
+                # Method call
+                struct_name, method_name = target.split('.', 1)
+                test_code += f"        // let mut obj = {struct_name}::new();\n"
+                test_code += f"        // let result = obj.{method_name}({', '.join(vector.inputs.keys()) if vector.inputs else ''});\n"
+            else:
+                # Function call
+                test_code += f"        // let result = {target}({', '.join(vector.inputs.keys()) if vector.inputs else ''});\n"
+        
+        # Add assertions
+        test_code += "\n        // Assertions\n"
+        if vector.expected_outputs:
+            for key, value in vector.expected_outputs.items():
+                if isinstance(value, str):
+                    test_code += f"        // assert_eq!({key}, \"{value}\");\n"
+                elif isinstance(value, (int, float)):
+                    test_code += f"        // assert_eq!({key}, {value});\n"
+                elif isinstance(value, bool):
+                    test_code += f"        // assert_eq!({key}, {str(value).lower()});\n"
+                else:
+                    test_code += f"        // assert_eq!({key}, {repr(value)});\n"
+        
+        if vector.expected_errors:
+            test_code += "\n        // Error handling\n"
+            for error in vector.expected_errors:
+                test_code += f"        // Should handle {error}\n"
+                test_code += f"        // assert!(matches!(result, Err({error})));\n"
+        
+        # Add postconditions
+        if vector.postconditions:
+            test_code += "\n        // Postconditions\n"
+            for postcondition in vector.postconditions:
+                test_code += f"        // Postcondition: {postcondition}\n"
+        
+        if vector.teardown_function:
+            test_code += f"\n        {vector.teardown_function}();\n"
+        
+        test_code += "        // TODO: Implement test\n"
+        test_code += "    }\n"
+        test_code += "}\n"
+        
+        return test_code
+    
     def save_generated_tests(self, output_dir: Path):
         """Save generated test code to files"""
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -446,17 +652,61 @@ class Test{vector.vector_id.replace('_', '').title()}(unittest.TestCase):
             by_module[vector.module_name].append(vector)
         
         for module_name, vectors in by_module.items():
-            test_code = f'''"""
+            # Detect language from first vector's module
+            module_path = self.coverage_analyzer._find_module_file(module_name)
+            if module_path:
+                language = self.language_parser.detect_language(module_path)
+            else:
+                language = Language.PYTHON  # Default
+            
+            # Generate test code for all vectors
+            test_code = ""
+            if language == Language.PYTHON:
+                test_code = f'''"""
 Auto-generated tests for {module_name}
 Generated by Unified Test Harness
 """
 '''
+            elif language == Language.C:
+                test_code = f'''/*
+ * Auto-generated tests for {module_name}
+ * Generated by Unified Test Harness
+ */
+
+#include "unity.h"
+#include "{module_name}.h"
+
+'''
+            elif language == Language.RUST:
+                test_code = f'''/*
+ * Auto-generated tests for {module_name}
+ * Generated by Unified Test Harness
+ */
+
+#[cfg(test)]
+mod tests {{
+    use super::*;
+
+'''
             
             for vector in vectors:
-                test_code += self.generate_test_code(vector)
+                vector_code = self.generate_test_code(vector)
+                test_code += vector_code
                 test_code += "\n\n"
             
-            test_file = output_dir / f"test_{module_name}_generated.py"
+            if language == Language.RUST:
+                test_code += "}\n"
+            
+            # Determine file extension
+            if language == Language.PYTHON:
+                test_file = output_dir / f"test_{module_name}_generated.py"
+            elif language == Language.C:
+                test_file = output_dir / f"test_{module_name}_generated.c"
+            elif language == Language.RUST:
+                test_file = output_dir / f"test_{module_name}_generated.rs"
+            else:
+                test_file = output_dir / f"test_{module_name}_generated.py"
+            
             with open(test_file, 'w') as f:
                 f.write(test_code)
             

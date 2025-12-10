@@ -1,20 +1,23 @@
 # Unified Test Harness
 
-A framework-agnostic, vector database-driven testing harness that ci devised for rapid test generation in huge programs. Works with any Python project and testing framework.
+A framework-agnostic, vector database-driven testing harness that ci devised for rapid test generation in huge programs. Works with Python, C, and Rust projects and testing frameworks.
 
 ## Overview
 
 This unified test harness provides:
 
-- **Framework Agnostic**: Works with pytest, unittest, nose, and custom test frameworks
+- **Multi-Language Support**: Works with Python, C, and Rust projects
+- **Framework Agnostic**: Works with pytest, unittest, Unity (C), cargo test (Rust), and custom test frameworks
 - **Vector Database Integration**: Uses ChromaDB for semantic code similarity search
 - **LLM-Powered Generation**: Supports OpenAI and Anthropic for intelligent test generation
 - **Coverage-Driven**: Identifies gaps and prioritizes test generation
 - **Template-Based**: Learns from existing tests and adapts them to new code
-- **Configurable**: Supports different project structures (standard, src/, modules/)
+- **Configurable**: Supports different project structures (standard, src/, modules/, C projects, Rust projects)
 - **CI/CD Ready**: Designed for integration into automated workflows
 
 ## Quick Start
+
+### Python Projects
 
 ```bash
 # Install dependencies
@@ -31,10 +34,38 @@ export OPENAI_API_KEY=your_key_here
 python -m unified_test_harness.cli --use-llm
 ```
 
+### C Projects
+
+```bash
+# Install system dependencies
+sudo apt-get install gcc lcov  # or equivalent for your system
+
+# Initialize harness (auto-detects C project)
+python -m unified_test_harness.cli --init --language c
+
+# Run full harness
+python -m unified_test_harness.cli --language c
+```
+
+### Rust Projects
+
+```bash
+# Install Rust and cargo-tarpaulin
+cargo install cargo-tarpaulin
+
+# Initialize harness (auto-detects Rust project)
+python -m unified_test_harness.cli --init --language rust
+
+# Run full harness
+python -m unified_test_harness.cli --language rust
+```
+
 ## Features
 
 ### 1. Coverage Analysis
-- Runs test suite with coverage tracking
+- **Python**: Uses pytest-cov for coverage analysis
+- **C**: Uses gcov/lcov for coverage analysis
+- **Rust**: Uses cargo-tarpaulin for coverage analysis
 - Identifies uncovered functions and modules
 - Prioritizes gaps by severity and importance
 - Generates comprehensive coverage reports
@@ -47,7 +78,10 @@ python -m unified_test_harness.cli --use-llm
 
 ### 3. LLM-Powered Generation
 - Generates comprehensive test vectors
-- Creates test code in multiple formats
+- Creates test code in multiple formats:
+  - **Python**: pytest and unittest formats
+  - **C**: Unity test framework format
+  - **Rust**: Built-in `#[test]` format
 - Supports OpenAI and Anthropic APIs
 - Falls back to template-based generation
 
@@ -117,11 +151,27 @@ print(f"Generated: {len(results['generated_vectors'])} vectors")
 
 ## Configuration
 
-The harness supports three project structure types:
+The harness supports multiple project structure types:
 
+### Python Projects
 1. **standard**: Flat structure with tests/ directory
 2. **src_layout**: Source code in src/, tests in tests/
 3. **modules_layout**: Source code in modules/, tests in tests/
+
+### C Projects
+- **c_project**: Standard C project with src/ and tests/ directories
+- Supports Unity, CUnit, and Check test frameworks
+- Uses gcov/lcov for coverage
+
+### Rust Projects
+- **rust_project**: Standard Cargo project structure
+- Uses built-in `#[test]` framework
+- Uses cargo-tarpaulin for coverage
+
+Language and project type are auto-detected, but can be explicitly specified:
+```bash
+python -m unified_test_harness.cli --language rust --project-type rust_project
+```
 
 ## Output
 
@@ -135,11 +185,22 @@ After running, the harness generates:
 
 ## Requirements
 
+### Core Requirements
 - Python 3.8+
-- pytest (for test execution)
-- pytest-cov (for coverage)
+- pytest (for Python test execution)
+- pytest-cov (for Python coverage)
 - chromadb (for vector database, optional)
 - openai or anthropic (for LLM generation, optional)
+
+### C/C++ Requirements (optional)
+- gcc compiler
+- gcov (usually included with gcc)
+- lcov (for coverage reports)
+- Unity test framework (recommended) or CUnit/Check
+
+### Rust Requirements (optional)
+- Rust and Cargo
+- cargo-tarpaulin (for coverage): `cargo install cargo-tarpaulin`
 
 ## Installation
 

@@ -12,6 +12,14 @@ chromadb>=0.4.0
 openai>=1.0.0
 anthropic>=0.7.0
 
+# C/C++ support (optional)
+# Requires system packages: gcc, gcov, lcov
+# Install with: sudo apt-get install gcc lcov
+
+# Rust support (optional)
+# Requires: cargo, cargo-tarpaulin
+# Install with: cargo install cargo-tarpaulin
+
 # Development dependencies
 black>=23.0.0
 pylint>=2.17.0

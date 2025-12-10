@@ -4,7 +4,7 @@ Unified Test Harness
 A framework-agnostic, vector database-driven testing harness that combines
 coverage analysis, LLM-powered test generation, and template-based test creation.
 
-Works with any Python project and testing framework.
+Works with Python, C, and Rust projects and testing frameworks.
 """
 
 __version__ = "1.0.0"
@@ -15,6 +15,7 @@ from .code_embedder import CodeEmbedder
 from .llm_generator import LLMTestGenerator
 from .harness_runner import TestHarnessRunner
 from .config import HarnessConfig
+from .language_parser import LanguageParser, Language, CodeElement
 
 __all__ = [
     'TestVector',
@@ -26,4 +27,7 @@ __all__ = [
     'LLMTestGenerator',
     'TestHarnessRunner',
     'HarnessConfig',
+    'LanguageParser',
+    'Language',
+    'CodeElement',
 ]
