@@ -90,13 +90,45 @@ class HarnessConfig:
         )
     
     @classmethod
-    def create_for_project(cls, source_root: Path, project_type: str = "standard") -> 'HarnessConfig':
-        """Create configuration for common project types"""
+    def create_for_project(cls, source_root: Path, project_type: str = "standard", language: str = "python") -> 'HarnessConfig':
+        """Create configuration for common project types
+        
+        Args:
+            source_root: Root directory of the project
+            project_type: Project structure type ("standard", "src_layout", "modules_layout", "c_project", "rust_project")
+            language: Primary language ("python", "c", "rust")
+        """
         test_dir = source_root / "tests"
         output_dir = source_root / "tests" / "harness_output"
         
-        if project_type == "src_layout":
-            # src/ structure
+        if language == "c" or project_type == "c_project":
+            # C project structure
+            framework = FrameworkConfig(
+                name="c_project",
+                test_framework="unity",  # Unity test framework
+                source_patterns=["src/**/*.c", "src/**/*.h", "**/*.c", "**/*.h"],
+                test_patterns=["tests/**/test_*.c", "tests/**/*_test.c"],
+                import_prefix="",
+                test_import_prefix="",
+                coverage_source=".",
+                test_command=["make", "test"],  # Assumes Makefile
+                coverage_command=["make", "coverage"],  # Assumes Makefile with coverage target
+            )
+        elif language == "rust" or project_type == "rust_project":
+            # Rust project structure
+            framework = FrameworkConfig(
+                name="rust_project",
+                test_framework="cargo",
+                source_patterns=["src/**/*.rs"],
+                test_patterns=["tests/**/*.rs", "**/*test*.rs"],
+                import_prefix="",
+                test_import_prefix="",
+                coverage_source="src",
+                test_command=["cargo", "test"],
+                coverage_command=["cargo", "tarpaulin", "--out", "Xml"],
+            )
+        elif project_type == "src_layout":
+            # src/ structure (Python)
             framework = FrameworkConfig(
                 name="src_layout",
                 test_framework="pytest",
@@ -109,7 +141,7 @@ class HarnessConfig:
                 coverage_command=["pytest", "tests", "--cov=src", "--cov-report=xml"],
             )
         elif project_type == "modules_layout":
-            # modules/ structure
+            # modules/ structure (Python)
             framework = FrameworkConfig(
                 name="modules_layout",
                 test_framework="pytest",
@@ -122,7 +154,7 @@ class HarnessConfig:
                 coverage_command=["pytest", "tests", "--cov=modules", "--cov-report=xml"],
             )
         else:
-            # Standard flat structure
+            # Standard flat structure (Python)
             framework = FrameworkConfig(
                 name="standard",
                 test_framework="pytest",

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from .harness_runner import TestHarnessRunner
 from .config import HarnessConfig
+from .language_parser import LanguageParser
 
 
 def main():
@@ -42,9 +43,13 @@ Examples:
     parser.add_argument("--output-dir", type=Path, default=None,
                        help="Output directory (default: test_dir/harness_output)")
     parser.add_argument("--project-type", type=str, 
-                       choices=["standard", "src_layout", "modules_layout"],
-                       default="standard", 
-                       help="Project structure type (default: standard)")
+                       choices=["standard", "src_layout", "modules_layout", "c_project", "rust_project"],
+                       default=None,
+                       help="Project structure type (auto-detected if not specified)")
+    parser.add_argument("--language", type=str,
+                       choices=["python", "c", "rust"],
+                       default=None,
+                       help="Primary language (auto-detected if not specified)")
     
     # LLM options
     parser.add_argument("--use-llm", action="store_true",
@@ -85,8 +90,41 @@ Examples:
     test_dir = args.test_dir or (source_root / "tests")
     output_dir = args.output_dir or (test_dir / "harness_output")
     
+    # Auto-detect language if not specified
+    language = args.language
+    if not language:
+        parser = LanguageParser()
+        # Check for common files
+        if (source_root / "Cargo.toml").exists():
+            language = "rust"
+        elif (source_root / "Makefile").exists() or list(source_root.glob("*.c")):
+            language = "c"
+        elif list(source_root.glob("*.py")):
+            language = "python"
+        else:
+            language = "python"  # Default
+    
+    # Auto-detect project type if not specified
+    project_type = args.project_type
+    if not project_type:
+        if language == "rust":
+            project_type = "rust_project"
+        elif language == "c":
+            project_type = "c_project"
+        else:
+            # Check for Python project structure
+            if (source_root / "src").exists():
+                project_type = "src_layout"
+            elif (source_root / "modules").exists():
+                project_type = "modules_layout"
+            else:
+                project_type = "standard"
+    
+    print(f"[*] Detected language: {language}")
+    print(f"[*] Using project type: {project_type}")
+    
     # Create configuration
-    config = HarnessConfig.create_for_project(source_root, args.project_type)
+    config = HarnessConfig.create_for_project(source_root, project_type, language)
     config.test_dir = test_dir
     config.output_dir = output_dir
     config.vector_db_path = output_dir / "vector_db"

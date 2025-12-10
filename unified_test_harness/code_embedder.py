@@ -3,6 +3,7 @@ Code Embedder for Vector Database
 
 Embeds source code into vector database for similarity search.
 Framework-agnostic implementation.
+Supports Python, C, and Rust.
 """
 
 import ast
@@ -11,6 +12,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from collections import defaultdict
+
+from .language_parser import LanguageParser, Language
 
 try:
     import chromadb
@@ -61,6 +64,7 @@ class CodeEmbedder:
         self.db_path = config.vector_db_path
         self.client = None
         self.collections = {}
+        self.language_parser = LanguageParser()
         
         if CHROMADB_AVAILABLE and config.use_vector_db:
             self._init_db()
@@ -86,6 +90,10 @@ class CodeEmbedder:
             'code_classes': self.client.get_or_create_collection(
                 name='code_classes',
                 metadata={"description": "Class-level code embeddings"}
+            ),
+            'code_structs': self.client.get_or_create_collection(
+                name='code_structs',
+                metadata={"description": "Struct-level code embeddings (C/Rust)"}
             ),
             'code_modules': self.client.get_or_create_collection(
                 name='code_modules',
@@ -115,26 +123,48 @@ class CodeEmbedder:
             embedding.append(0.0)
         return embedding[:384]
     
-    def _parse_python_file(self, file_path: Path) -> List[CodeSegment]:
-        """Parse Python file and extract code segments."""
+    def _parse_source_file(self, file_path: Path) -> List[CodeSegment]:
+        """Parse source file (Python, C, or Rust) and extract code segments."""
         segments = []
+        
+        language = self.language_parser.detect_language(file_path)
+        if not language:
+            return segments
         
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            tree = ast.parse(content)
-            
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef):
-                    segment = self._extract_function(node, file_path, content)
-                    segments.append(segment)
-                elif isinstance(node, ast.ClassDef):
-                    segment = self._extract_class(node, file_path, content)
-                    segments.append(segment)
-            
-            # Add module-level segment
+            # Parse using language parser
+            elements = self.language_parser.parse_file(file_path)
             rel_path = str(file_path.relative_to(self.config.source_root))
+            
+            for element in elements:
+                # Extract code snippet
+                lines = content.splitlines()
+                if element.start_line <= len(lines):
+                    code_lines = lines[element.start_line-1:element.end_line]
+                    code_snippet = '\n'.join(code_lines)
+                else:
+                    code_snippet = ""
+                
+                # Create segment
+                unique_id = f"{rel_path}::{element.name}::{element.start_line}"
+                segment = CodeSegment(
+                    id=unique_id,
+                    type=element.type,
+                    name=element.name,
+                    file_path=rel_path,
+                    start_line=element.start_line,
+                    end_line=element.end_line,
+                    code=code_snippet,
+                    docstring=element.docstring,
+                    signature=element.signature,
+                    parent_class=element.parent
+                )
+                segments.append(segment)
+            
+            # Add module/file-level segment
             module_segment = CodeSegment(
                 id=f"{rel_path}::module",
                 type='module',
@@ -143,7 +173,7 @@ class CodeEmbedder:
                 start_line=1,
                 end_line=len(content.splitlines()),
                 code=content[:1000],  # First 1000 chars
-                docstring=ast.get_docstring(tree)
+                docstring=None
             )
             segments.append(module_segment)
             
@@ -151,6 +181,10 @@ class CodeEmbedder:
             print(f"Error parsing {file_path}: {e}")
         
         return segments
+    
+    def _parse_python_file(self, file_path: Path) -> List[CodeSegment]:
+        """Parse Python file and extract code segments (legacy method, uses _parse_source_file)."""
+        return self._parse_source_file(file_path)
     
     def _extract_function(self, node: ast.FunctionDef, file_path: Path, content: str) -> CodeSegment:
         """Extract function code segment."""
@@ -223,19 +257,30 @@ class CodeEmbedder:
         all_segments = []
         source_patterns = self.config.framework.source_patterns
         
-        # Find all Python files
-        python_files = set()
+        # Find all source files (Python, C, Rust)
+        source_files = set()
         for pattern in source_patterns:
-            for py_file in self.config.source_root.glob(pattern):
-                if '__pycache__' in str(py_file) or py_file.name == "__init__.py":
+            for src_file in self.config.source_root.glob(pattern):
+                if '__pycache__' in str(src_file) or src_file.name == "__init__.py":
                     continue
-                if py_file.suffix == ".py":
-                    python_files.add(py_file)
+                if src_file.suffix in [".py", ".c", ".h", ".rs", ".cpp", ".cc", ".cxx", ".hpp"]:
+                    source_files.add(src_file)
         
-        print(f"[*] Found {len(python_files)} Python files")
+        # Group by language
+        by_language = {}
+        for src_file in source_files:
+            lang = self.language_parser.detect_language(src_file)
+            if lang:
+                if lang not in by_language:
+                    by_language[lang] = []
+                by_language[lang].append(src_file)
         
-        for py_file in python_files:
-            segments = self._parse_python_file(py_file)
+        print(f"[*] Found {len(source_files)} source files")
+        for lang, files in by_language.items():
+            print(f"  - {lang.value}: {len(files)} files")
+        
+        for src_file in source_files:
+            segments = self._parse_source_file(src_file)
             all_segments.extend(segments)
         
         print(f"[*] Extracted {len(all_segments)} code segments")
@@ -246,7 +291,19 @@ class CodeEmbedder:
             by_type[segment.type].append(segment)
         
         for seg_type, segments in by_type.items():
-            collection_name = f'code_{seg_type}s'
+            # Map types to collection names
+            if seg_type == 'struct':
+                collection_name = 'code_structs'
+            elif seg_type == 'class':
+                collection_name = 'code_classes'
+            elif seg_type == 'function':
+                collection_name = 'code_functions'
+            elif seg_type == 'module':
+                collection_name = 'code_modules'
+            else:
+                # For impl, trait, etc., use functions collection
+                collection_name = 'code_functions'
+            
             if collection_name not in self.collections:
                 continue
             
@@ -313,28 +370,124 @@ class CodeEmbedder:
         
         for test_file in test_files:
             try:
-                with open(test_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
+                language = self.language_parser.detect_language(test_file)
                 
-                # Extract test functions
-                tree = ast.parse(content)
-                for node in ast.walk(tree):
-                    if isinstance(node, ast.FunctionDef) and node.name.startswith('test_'):
-                        test_code = ast.get_source_segment(content, node)
-                        if test_code:
-                            rel_path = str(test_file.relative_to(self.config.test_dir))
-                            unique_id = f"{rel_path}::{node.name}::{node.lineno}"
+                if language == Language.PYTHON:
+                    # Python tests
+                    with open(test_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Extract test functions
+                    tree = ast.parse(content)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.FunctionDef) and node.name.startswith('test_'):
+                            test_code = ast.get_source_segment(content, node)
+                            if test_code:
+                                rel_path = str(test_file.relative_to(self.config.test_dir))
+                                unique_id = f"{rel_path}::{node.name}::{node.lineno}"
+                                
+                                template = TestTemplate(
+                                    id=unique_id,
+                                    name=node.name,
+                                    code_type=self._classify_test_type(test_code),
+                                    test_code=test_code,
+                                    coverage_patterns=[],
+                                    fixtures_used=self._extract_fixtures(test_code),
+                                    parametrization='parametrize' in test_code
+                                )
+                                templates.append(template)
+                
+                elif language == Language.C:
+                    # C tests (Unity, CUnit, Check, etc.)
+                    with open(test_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Extract test functions (pattern: void test_*() or TEST_*)
+                    import re
+                    test_pattern = re.compile(r'(?:void\s+)?(?:TEST|test_|TEST_)(\w+)\s*\([^)]*\)\s*\{', re.MULTILINE)
+                    for match in test_pattern.finditer(content):
+                        test_name = match.group(1)
+                        start_pos = match.start()
+                        start_line = content[:start_pos].count('\n') + 1
+                        
+                        # Find matching closing brace
+                        brace_count = 0
+                        end_pos = start_pos
+                        for i, char in enumerate(content[start_pos:], start_pos):
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    end_pos = i + 1
+                                    break
+                        
+                        test_code = content[start_pos:end_pos]
+                        rel_path = str(test_file.relative_to(self.config.test_dir))
+                        unique_id = f"{rel_path}::{test_name}::{start_line}"
+                        
+                        template = TestTemplate(
+                            id=unique_id,
+                            name=test_name,
+                            code_type='unit',
+                            test_code=test_code,
+                            coverage_patterns=[],
+                            fixtures_used=[],
+                            parametrization=False
+                        )
+                        templates.append(template)
+                
+                elif language == Language.RUST:
+                    # Rust tests
+                    with open(test_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Extract test functions (#[test] fn test_*)
+                    import re
+                    test_pattern = re.compile(r'#\[test\]\s+fn\s+(test_\w+)\s*\([^)]*\)\s*\{', re.MULTILINE)
+                    for match in test_pattern.finditer(content):
+                        test_name = match.group(1)
+                        start_pos = match.start()
+                        start_line = content[:start_pos].count('\n') + 1
+                        
+                        # Find matching closing brace
+                        brace_count = 0
+                        end_pos = start_pos
+                        in_string = False
+                        string_char = None
+                        
+                        for i, char in enumerate(content[start_pos:], start_pos):
+                            if char in ['"', "'"] and (i == start_pos or content[i-1] != '\\'):
+                                if not in_string:
+                                    in_string = True
+                                    string_char = char
+                                elif char == string_char:
+                                    in_string = False
+                                    string_char = None
                             
-                            template = TestTemplate(
-                                id=unique_id,
-                                name=node.name,
-                                code_type=self._classify_test_type(test_code),
-                                test_code=test_code,
-                                coverage_patterns=[],
-                                fixtures_used=self._extract_fixtures(test_code),
-                                parametrization='parametrize' in test_code
-                            )
-                            templates.append(template)
+                            if not in_string:
+                                if char == '{':
+                                    brace_count += 1
+                                elif char == '}':
+                                    brace_count -= 1
+                                    if brace_count == 0:
+                                        end_pos = i + 1
+                                        break
+                        
+                        test_code = content[start_pos:end_pos]
+                        rel_path = str(test_file.relative_to(self.config.test_dir))
+                        unique_id = f"{rel_path}::{test_name}::{start_line}"
+                        
+                        template = TestTemplate(
+                            id=unique_id,
+                            name=test_name,
+                            code_type='unit',
+                            test_code=test_code,
+                            coverage_patterns=[],
+                            fixtures_used=[],
+                            parametrization=False
+                        )
+                        templates.append(template)
             
             except Exception as e:
                 print(f"Error parsing {test_file}: {e}")
