@@ -16,6 +16,7 @@ from .llm_generator import LLMTestGenerator
 from .harness_runner import TestHarnessRunner
 from .config import HarnessConfig
 from .language_parser import LanguageParser, Language, CodeElement
+from .code_analyzer import CodeAnalyzer, FunctionInfo, ModuleInfo
 
 __all__ = [
     'TestVector',
@@ -30,4 +31,7 @@ __all__ = [
     'LanguageParser',
     'Language',
     'CodeElement',
+    'CodeAnalyzer',
+    'FunctionInfo',
+    'ModuleInfo',
 ]
