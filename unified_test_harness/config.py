@@ -67,6 +67,14 @@ class HarnessConfig:
     # Advanced options
     parallel_generation: bool = False
     similarity_threshold: float = 0.7
+    # DSMIL/enterprise specific controls
+    integration_targets: List[str] = field(default_factory=list)
+    dependency_stubs: Dict[str, Any] = field(default_factory=dict)
+    focus_paths: List[str] = field(default_factory=list)
+    allow_network: bool = False
+    allow_filesystem: bool = False
+    random_seed: int = 1337
+    pytest_addopts: List[str] = field(default_factory=lambda: ["-q"])
     
     @classmethod
     def create_default(cls, source_root: Path, test_dir: Path, output_dir: Path) -> 'HarnessConfig':
@@ -153,6 +161,37 @@ class HarnessConfig:
                 test_command=["pytest", "tests"],
                 coverage_command=["pytest", "tests", "--cov=modules", "--cov-report=xml"],
             )
+        elif project_type == "dsmil_system":
+            # DSMILSystem layout (Python-first with adapters/entrypoints)
+            framework = FrameworkConfig(
+                name="dsmil_system",
+                test_framework="pytest",
+                source_patterns=[
+                    "ai/**/*.py",
+                    "adapters/**/*.py",
+                    "entrypoints/*.py",
+                    "toolchains/dsmilkitwebframe/**/*.py",
+                    "toolchains/dsmilkitwebframe/*.py",
+                ],
+                test_patterns=["tests/**/test_*.py", "tests/**/*_test.py"],
+                import_prefix="",
+                test_import_prefix="",
+                coverage_source=".",
+                test_command=["pytest", "tests"],
+                coverage_command=[
+                    "pytest",
+                    "tests",
+                    "--maxfail=1",
+                    "--disable-warnings",
+                    "--cov=ai",
+                    "--cov=adapters",
+                    "--cov=entrypoints",
+                    "--cov-report=xml",
+                ],
+            )
+            # Point defaults to DSMIL tests/output locations
+            test_dir = source_root / "tests"
+            output_dir = test_dir / "harness_output"
         else:
             # Standard flat structure (Python)
             framework = FrameworkConfig(
@@ -173,6 +212,18 @@ class HarnessConfig:
             output_dir=output_dir,
             vector_db_path=output_dir / "vector_db",
             framework=framework,
+            integration_targets=[
+                "entrypoints.rce",
+                "entrypoints.scan",
+                "entrypoints.wifi",
+                "adapters.hdais",
+            ] if project_type == "dsmil_system" else [],
+            focus_paths=[
+                "entrypoints",
+                "ai",
+                "adapters",
+                "toolchains/dsmilkitwebframe",
+            ] if project_type == "dsmil_system" else [],
         )
     
     def to_dict(self) -> Dict[str, Any]:
@@ -198,6 +249,18 @@ class HarnessConfig:
             'llm_model': self.llm_model,
             'coverage_threshold': self.coverage_threshold,
             'batch_size': self.batch_size,
+            'max_tests_per_module': self.max_tests_per_module,
+            'generate_unit_tests': self.generate_unit_tests,
+            'generate_integration_tests': self.generate_integration_tests,
+            'generate_edge_cases': self.generate_edge_cases,
+            'generate_error_tests': self.generate_error_tests,
+            'integration_targets': self.integration_targets,
+            'dependency_stubs': self.dependency_stubs,
+            'focus_paths': self.focus_paths,
+            'allow_network': self.allow_network,
+            'allow_filesystem': self.allow_filesystem,
+            'random_seed': self.random_seed,
+            'pytest_addopts': self.pytest_addopts,
         }
     
     @classmethod
@@ -227,4 +290,16 @@ class HarnessConfig:
             llm_model=data.get('llm_model', 'gpt-4'),
             coverage_threshold=data.get('coverage_threshold', 0.8),
             batch_size=data.get('batch_size', 50),
+            max_tests_per_module=data.get('max_tests_per_module', 100),
+            generate_unit_tests=data.get('generate_unit_tests', True),
+            generate_integration_tests=data.get('generate_integration_tests', True),
+            generate_edge_cases=data.get('generate_edge_cases', True),
+            generate_error_tests=data.get('generate_error_tests', True),
+            integration_targets=data.get('integration_targets', []),
+            dependency_stubs=data.get('dependency_stubs', {}),
+            focus_paths=data.get('focus_paths', []),
+            allow_network=data.get('allow_network', False),
+            allow_filesystem=data.get('allow_filesystem', False),
+            random_seed=data.get('random_seed', 1337),
+            pytest_addopts=data.get('pytest_addopts', ["-q"]),
         )

@@ -75,6 +75,17 @@ export OPENAI_API_KEY=your_api_key_here
 python -m unified_test_harness.cli --use-llm
 ```
 
+### DSMILSystem Example (entrypoints + adapters)
+
+```bash
+cd /home/john/DSMILSystem
+python -m unified_test_harness.cli --project-type dsmil_system --init
+python -m unified_test_harness.cli --project-type dsmil_system --use-llm \
+  --modules entrypoints.rce entrypoints.scan adapters.hdais
+```
+
+- Defaults to pytest, deterministic seeds, and safety fixtures to avoid real network/FS writes
+
 ### What You'll See
 
 ```

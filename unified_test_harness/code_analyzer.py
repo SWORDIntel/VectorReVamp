@@ -29,6 +29,10 @@ class FunctionInfo:
     dependencies: List[str] = field(default_factory=list)  # Functions/classes used
     is_async: bool = False
     is_generator: bool = False
+    io_operations: List[str] = field(default_factory=list)  # file IO, fs paths
+    network_calls: List[str] = field(default_factory=list)  # sockets/requests/subprocess
+    env_usage: List[str] = field(default_factory=list)  # env vars read/written
+    global_state: List[str] = field(default_factory=list)  # globals mutated
 
 
 @dataclass
@@ -138,12 +142,36 @@ class CodeAnalyzer:
         
         # Extract dependencies (function calls)
         dependencies = []
+        io_operations = []
+        network_calls = []
+        env_usage = []
+        global_state = []
         for child in ast.walk(node):
             if isinstance(child, ast.Call):
                 if isinstance(child.func, ast.Name):
                     dependencies.append(child.func.id)
+                    if child.func.id in {"open", "Path"}:
+                        io_operations.append(child.func.id)
+                    if child.func.id in {"requests", "session", "post", "get"}:
+                        network_calls.append(child.func.id)
+                    if child.func.id in {"subprocess", "Popen", "run"}:
+                        network_calls.append(child.func.id)
                 elif isinstance(child.func, ast.Attribute):
-                    dependencies.append(ast.unparse(child.func) if hasattr(ast, 'unparse') else str(child.func))
+                    attr_expr = ast.unparse(child.func) if hasattr(ast, 'unparse') else str(child.func)
+                    dependencies.append(attr_expr)
+                    if attr_expr.startswith("os.environ"):
+                        env_usage.append(attr_expr)
+                    if attr_expr.startswith(("requests.", "httpx.", "socket.", "subprocess.")):
+                        network_calls.append(attr_expr)
+                    if ".open" in attr_expr or attr_expr.startswith(("pathlib.", "Path(")):
+                        io_operations.append(attr_expr)
+            if isinstance(child, ast.Assign):
+                for target in child.targets:
+                    if isinstance(target, ast.Name) and target.id.isupper():
+                        global_state.append(target.id)
+            if isinstance(child, ast.AugAssign):
+                if isinstance(child.target, ast.Name) and child.target.id.isupper():
+                    global_state.append(child.target.id)
         
         # Check if async
         is_async = isinstance(node, ast.AsyncFunctionDef)
@@ -176,7 +204,11 @@ class CodeAnalyzer:
             raises=raises,
             dependencies=list(set(dependencies)),
             is_async=is_async,
-            is_generator=is_generator
+            is_generator=is_generator,
+            io_operations=list(set(io_operations)),
+            network_calls=list(set(network_calls)),
+            env_usage=list(set(env_usage)),
+            global_state=list(set(global_state)),
         )
     
     def _analyze_c_function(self, file_path: Path, function_name: str) -> Optional[FunctionInfo]:

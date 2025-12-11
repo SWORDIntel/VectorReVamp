@@ -126,6 +126,8 @@ class TestHarnessRunner:
             for gap in batch:
                 module_name = gap['module']
                 priority = gap.get('priority', 'medium')
+                if module_name in getattr(self.config, "integration_targets", []):
+                    priority = "high"
                 
                 vectors = self.llm_generator.generate_vectors_for_module(
                     module_name,

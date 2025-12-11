@@ -104,6 +104,18 @@ python -m unified_test_harness.cli --init --language rust
 python -m unified_test_harness.cli --language rust
 ```
 
+### For DSMILSystem (pytest, entrypoint focus)
+
+```bash
+# From DSMILSystem root
+python -m unified_test_harness.cli --project-type dsmil_system --init
+python -m unified_test_harness.cli --project-type dsmil_system --use-llm \
+  --modules entrypoints.rce entrypoints.scan adapters.hdais
+```
+
+- Safety defaults: network/filesystem writes are blocked in generated tests unless explicitly enabled
+- Targets entrypoints/adapters; outputs pytest suites tuned for minimal post-editing
+
 ## 🎯 Common Use Cases
 
 ### 1. Daily Development Workflow

@@ -76,6 +76,19 @@ class LLMTestGenerator:
         """Generate enhanced prompt for LLM to create test vectors with detailed context"""
         import_prefix = self.config.framework.import_prefix
         
+        safety_directives = []
+        if not getattr(self.config, "allow_network", False):
+            safety_directives.append("Do NOT perform real network calls; mock sockets/HTTP clients.")
+        if not getattr(self.config, "allow_filesystem", False):
+            safety_directives.append("Do NOT perform real filesystem writes; use tmp paths or mocks.")
+        safety_directives.append("Use deterministic seeds where randomness is needed.")
+        safety_directives.append("Avoid sleeps/time-dependent assertions; keep tests fast and deterministic.")
+        safety_text = "\n".join([f"- {d}" for d in safety_directives])
+
+        integration_targets = getattr(self.config, "integration_targets", [])
+        dependency_stubs = getattr(self.config, "dependency_stubs", {})
+        focus_paths = getattr(self.config, "focus_paths", [])
+
         # Analyze functions to get detailed information
         module_path = self.coverage_analyzer._find_module_file(module_name)
         function_details = []
@@ -126,6 +139,14 @@ class LLMTestGenerator:
                 func_details_text += f"  Raises: {', '.join(func_info.raises)}\n"
             if func_info.dependencies:
                 func_details_text += f"  Uses: {', '.join(func_info.dependencies[:5])}\n"
+            if func_info.io_operations:
+                func_details_text += f"  IO: {', '.join(func_info.io_operations[:5])}\n"
+            if func_info.network_calls:
+                func_details_text += f"  Network: {', '.join(func_info.network_calls[:5])}\n"
+            if func_info.env_usage:
+                func_details_text += f"  Env: {', '.join(func_info.env_usage[:5])}\n"
+            if func_info.global_state:
+                func_details_text += f"  Globals: {', '.join(func_info.global_state[:5])}\n"
         
         # Build similar tests examples
         examples_text = ""
@@ -179,6 +200,12 @@ Generate test vectors that:
    - For collections: include empty, single item, multiple items
    - For optional/nullable: include None/null and valid values
    - Use realistic values based on function purpose and docstring
+6. **Safety & Determinism**:
+   - {safety_text}
+   - Use dependency stubs when present: {json.dumps(dependency_stubs)}
+   - Prefer local/temp data; avoid real endpoints, secrets, or filesystem mutations outside tmp dirs.
+7. **Integration Targets**:
+   - Treat modules in {integration_targets} or paths under {focus_paths} as integration candidates; include fakes for network/FS/IPC boundaries.
 
 ## Output Format
 
@@ -229,7 +256,9 @@ Your task is to generate high-quality, production-ready test vectors that:
 2. Cover all important scenarios - normal cases, edge cases, error cases
 3. Use realistic test data appropriate for the function's purpose
 4. Follow testing best practices and patterns from the codebase
-5. Output valid JSON that can be directly used without manual correction
+5. Avoid external side-effects (network/filesystem) unless explicitly allowed; prefer mocks/fakes.
+6. Use deterministic seeds; avoid sleeps/time-sensitive behavior.
+7. Output valid JSON that can be directly used without manual correction
 
 When generating test vectors:
 - Analyze function signatures carefully and use correct parameter names and types
@@ -310,6 +339,9 @@ Output ONLY valid JSON. Do not include markdown code blocks or explanations outs
                     if not self._validate_vector_data(vec_data):
                         print(f"[!] Skipping invalid vector: {vec_data.get('vector_id', 'unknown')}")
                         continue
+                    if self._contains_external_reference(vec_data):
+                        print(f"[!] Skipping vector with external references: {vec_data.get('vector_id', 'unknown')}")
+                        continue
                     
                     vector = TestVector(
                         vector_id=vec_data['vector_id'],
@@ -371,6 +403,21 @@ Output ONLY valid JSON. Do not include markdown code blocks or explanations outs
             return False
         
         return True
+
+    def _contains_external_reference(self, vec_data: Dict[str, Any]) -> bool:
+        """Guardrail to avoid network/secret usage in generated vectors"""
+        check_strings = []
+        for val in vec_data.get('inputs', {}).values():
+            if isinstance(val, str):
+                check_strings.append(val)
+        for val in vec_data.get('expected_outputs', {}).values():
+            if isinstance(val, str):
+                check_strings.append(val)
+        banned_prefixes = ("http://", "https://", "ssh://")
+        for text in check_strings:
+            if text.startswith(banned_prefixes):
+                return True
+        return False
     
     def refine_vectors(self, vectors: List[TestVector]) -> List[TestVector]:
         """Refine generated vectors using LLM validation"""
@@ -470,6 +517,8 @@ Return the refined vectors in the same JSON format, fixing all issues found."""
         for func_name in uncovered_functions:
             # Determine vector type based on function name patterns
             vector_type = TestVectorType.UNIT
+            if module_name in getattr(self.config, "integration_targets", []):
+                vector_type = TestVectorType.INTEGRATION
             if 'integration' in func_name.lower() or 'integration' in module_name.lower():
                 vector_type = TestVectorType.INTEGRATION
             elif 'error' in func_name.lower() or 'exception' in func_name.lower():
@@ -544,6 +593,30 @@ Priority: {vector.priority.value}
 Coverage targets: {', '.join(vector.coverage_targets)}
 """
 import pytest
+import random
+random.seed({getattr(self.config, "random_seed", 1337)})
+'''
+        if not getattr(self.config, "allow_network", False):
+            test_code += '''
+@pytest.fixture(autouse=True)
+def _disable_network(monkeypatch):
+    import socket
+    def _blocked(*args, **kwargs):
+        raise RuntimeError("network disabled in generated tests")
+    monkeypatch.setattr(socket, "create_connection", _blocked, raising=False)
+'''
+        if not getattr(self.config, "allow_filesystem", False):
+            test_code += '''
+@pytest.fixture(autouse=True)
+def _guard_filesystem(monkeypatch, tmp_path):
+    import builtins, os
+    real_open = builtins.open
+    def _safe_open(file, mode='r', *args, **kwargs):
+        if any(flag in mode for flag in ('w', 'a', 'x')) and not str(file).startswith(str(tmp_path)):
+            raise RuntimeError("filesystem writes disabled in generated tests")
+        return real_open(file, mode, *args, **kwargs)
+    monkeypatch.setattr(builtins, "open", _safe_open)
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
 '''
         
         # Import specific items if we have function info
@@ -1070,6 +1143,12 @@ mod tests {{
             # Determine file extension
             if language == Language.PYTHON:
                 test_file = output_dir / f"test_{module_name}_generated.py"
+                # Validate syntax early to reduce post-editing
+                try:
+                    import ast as _ast
+                    _ast.parse(test_code)
+                except Exception as e:  # pragma: no cover - defensive
+                    test_code = f"# Syntax check failed: {e}\n" + test_code
             elif language == Language.C:
                 test_file = output_dir / f"test_{module_name}_generated.c"
             elif language == Language.RUST:
