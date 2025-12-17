@@ -7,14 +7,21 @@ Supports Python (pytest-cov), C (gcov/lcov), and Rust (cargo-tarpaulin).
 """
 
 import ast
+import logging
+import subprocess
 from pathlib import Path
 from typing import Dict, List, Set, Tuple, Optional, Any
 import json
-import subprocess
 import xml.etree.ElementTree as ET
 import re
 
 from .language_parser import LanguageParser, Language
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Default timeout for subprocess calls (30 seconds)
+DEFAULT_TIMEOUT = 30
 
 
 class CoverageAnalyzer:
@@ -186,7 +193,7 @@ class CoverageAnalyzer:
                     coverage[name] = line_rate
             
         except Exception as e:
-            print(f"Error parsing coverage XML: {e}")
+            logger.warning(f"Error parsing coverage XML: {e}")
         
         return coverage
     
@@ -226,13 +233,13 @@ class CoverageAnalyzer:
                     current_file = None
         
         except Exception as e:
-            print(f"Error parsing LCOV file: {e}")
+            logger.warning(f"Error parsing LCOV file: {e}")
         
         return coverage
     
     def run_coverage_analysis(self) -> Dict[str, Any]:
         """Run coverage analysis using configured test framework"""
-        print("[*] Running coverage analysis...")
+        logger.info("Running coverage analysis...")
         
         # Detect language from source files
         source_patterns = self.config.framework.source_patterns
@@ -276,11 +283,11 @@ class CoverageAnalyzer:
                 cwd=self.source_root,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=DEFAULT_TIMEOUT * 20  # 10 minutes for Python coverage
             )
             
             if result.returncode != 0:
-                print(f"[!] Coverage command failed: {result.stderr}")
+                logger.error(f"Coverage command failed: {result.stderr}")
                 return {}
             
             if coverage_xml.exists():
@@ -288,16 +295,19 @@ class CoverageAnalyzer:
                 self.coverage_data = self.parse_coverage_xml(coverage_xml)
                 return self.get_coverage_report()
             else:
-                print("[!] Coverage XML not generated")
+                logger.warning("Coverage XML not generated")
                 return {}
                 
+        except subprocess.TimeoutExpired:
+            logger.error("Coverage command timed out")
+            return {}
         except Exception as e:
-            print(f"[!] Error running Python coverage: {e}")
+            logger.error(f"Error running Python coverage: {e}", exc_info=True)
             return {}
     
     def _run_c_coverage(self) -> Dict[str, Any]:
         """Run C coverage analysis using gcov/lcov"""
-        print("[*] Running C coverage with gcov/lcov...")
+        logger.info("Running C coverage with gcov/lcov...")
         
         coverage_dir = self.config.output_dir / "coverage"
         coverage_dir.mkdir(exist_ok=True)
@@ -315,7 +325,7 @@ class CoverageAnalyzer:
                 cwd=self.source_root,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=DEFAULT_TIMEOUT * 20  # 10 minutes for C coverage
             )
             
             if result.returncode == 0 and lcov_file.exists():
@@ -324,7 +334,7 @@ class CoverageAnalyzer:
                 self.coverage_xml = lcov_file
                 return self.get_coverage_report()
             else:
-                print("[!] LCOV generation failed, trying gcov directly...")
+                logger.warning("LCOV generation failed, trying gcov directly...")
                 # Try gcov directly
                 gcov_files = list(self.source_root.glob("**/*.gcov"))
                 if gcov_files:
@@ -333,15 +343,18 @@ class CoverageAnalyzer:
                 return {}
                 
         except FileNotFoundError:
-            print("[!] lcov/gcov not found. Install with: sudo apt-get install lcov")
+            logger.warning("lcov/gcov not found. Install with: sudo apt-get install lcov")
+            return {}
+        except subprocess.TimeoutExpired:
+            logger.error("C coverage command timed out")
             return {}
         except Exception as e:
-            print(f"[!] Error running C coverage: {e}")
+            logger.error(f"Error running C coverage: {e}", exc_info=True)
             return {}
     
     def _run_rust_coverage(self) -> Dict[str, Any]:
         """Run Rust coverage analysis using cargo-tarpaulin"""
-        print("[*] Running Rust coverage with cargo-tarpaulin...")
+        logger.info("Running Rust coverage with cargo-tarpaulin...")
         
         coverage_xml = self.config.output_dir / "coverage.xml"
         
@@ -350,11 +363,12 @@ class CoverageAnalyzer:
             result = subprocess.run(
                 ["cargo", "tarpaulin", "--version"],
                 capture_output=True,
-                text=True
+                text=True,
+                timeout=DEFAULT_TIMEOUT
             )
             
             if result.returncode != 0:
-                print("[!] cargo-tarpaulin not found. Install with: cargo install cargo-tarpaulin")
+                logger.warning("cargo-tarpaulin not found. Install with: cargo install cargo-tarpaulin")
                 return {}
             
             # Run tarpaulin
@@ -363,7 +377,7 @@ class CoverageAnalyzer:
                 cwd=self.source_root,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=DEFAULT_TIMEOUT * 20  # 10 minutes for Rust coverage
             )
             
             # Tarpaulin outputs to cobertura.xml
@@ -379,14 +393,17 @@ class CoverageAnalyzer:
                 self.coverage_data = self.parse_coverage_xml(coverage_xml)
                 return self.get_coverage_report()
             else:
-                print("[!] Tarpaulin XML not generated")
+                logger.warning("Tarpaulin XML not generated")
                 return {}
                 
         except FileNotFoundError:
-            print("[!] cargo not found. Make sure Rust is installed.")
+            logger.warning("cargo not found. Make sure Rust is installed.")
+            return {}
+        except subprocess.TimeoutExpired:
+            logger.error("Rust coverage command timed out")
             return {}
         except Exception as e:
-            print(f"[!] Error running Rust coverage: {e}")
+            logger.error(f"Error running Rust coverage: {e}", exc_info=True)
             return {}
     
     def get_uncovered_functions(self, module_name: str) -> List[str]:

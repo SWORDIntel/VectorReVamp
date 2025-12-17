@@ -7,6 +7,8 @@ Supports Python, C, and Rust test generation.
 """
 
 import json
+import logging
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import ast
@@ -14,6 +16,9 @@ import ast
 from .test_vector import TestVector, TestVectorType, TestPriority
 from .language_parser import LanguageParser, Language
 from .code_analyzer import CodeAnalyzer, FunctionInfo
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class LLMTestGenerator:
@@ -55,7 +60,8 @@ class LLMTestGenerator:
                     if api_key:
                         self.llm_client = openai.OpenAI(api_key=api_key)
             except ImportError:
-                print("[!] OpenAI library not installed. Install with: pip install openai")
+                logger.warning("OpenAI library not installed. Install with: pip install openai")
+                logger.warning("LLM features will be disabled")
         elif provider == "anthropic":
             try:
                 import anthropic
@@ -67,9 +73,10 @@ class LLMTestGenerator:
                     if api_key:
                         self.llm_client = anthropic.Anthropic(api_key=api_key)
             except ImportError:
-                print("[!] Anthropic library not installed. Install with: pip install anthropic")
+                logger.warning("Anthropic library not installed. Install with: pip install anthropic")
+                logger.warning("LLM features will be disabled")
         else:
-            print(f"[!] LLM provider '{provider}' not supported")
+            logger.error(f"LLM provider '{provider}' not supported")
     
     def generate_test_vector_prompt(self, module_name: str, uncovered_functions: List[str], 
                                    module_code: str, file_path: str) -> str:
@@ -280,31 +287,41 @@ Output ONLY valid JSON. Do not include markdown code blocks or explanations outs
             system_message += "- Missing edge cases or error handling\n"
             system_message += "- Improve test descriptions and names for clarity"
         
-        try:
-            if provider == "openai":
-                response = self.llm_client.chat.completions.create(
-                    model=self.config.llm_model,
-                    messages=[
-                        {"role": "system", "content": system_message},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.3 if refinement else 0.7,  # Lower temperature for refinement
-                    max_tokens=4000
-                )
-                return response.choices[0].message.content
-            elif provider == "anthropic":
-                response = self.llm_client.messages.create(
-                    model=self.config.llm_model,
-                    max_tokens=4000,
-                    messages=[
-                        {"role": "user", "content": f"{system_message}\n\n{prompt}"}
-                    ],
-                    temperature=0.3 if refinement else 0.7
-                )
-                return response.content[0].text
-        except Exception as e:
-            print(f"[!] LLM API error: {e}")
-            return ""
+        provider = self.config.llm_provider.lower()
+        max_retries = 3
+        
+        for attempt in range(max_retries):
+            try:
+                if provider == "openai":
+                    response = self.llm_client.chat.completions.create(
+                        model=self.config.llm_model,
+                        messages=[
+                            {"role": "system", "content": system_message},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.3 if refinement else 0.7,  # Lower temperature for refinement
+                        max_tokens=4000
+                    )
+                    return response.choices[0].message.content
+                elif provider == "anthropic":
+                    response = self.llm_client.messages.create(
+                        model=self.config.llm_model,
+                        max_tokens=4000,
+                        messages=[
+                            {"role": "user", "content": f"{system_message}\n\n{prompt}"}
+                        ],
+                        temperature=0.3 if refinement else 0.7
+                    )
+                    return response.content[0].text
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    # Exponential backoff: wait 2^attempt seconds
+                    wait_time = 2 ** attempt
+                    logger.warning(f"LLM API error (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"LLM API error after {max_retries} attempts: {e}", exc_info=True)
+                    return ""
         
         return ""
     
@@ -327,7 +344,7 @@ Output ONLY valid JSON. Do not include markdown code blocks or explanations outs
                     json_str = response[json_start:json_end]
             
             if not json_str:
-                print("[!] Could not extract JSON from LLM response")
+                logger.warning("Could not extract JSON from LLM response")
                 return []
             
             data = json.loads(json_str)
@@ -337,10 +354,10 @@ Output ONLY valid JSON. Do not include markdown code blocks or explanations outs
                 try:
                     # Validate vector data
                     if not self._validate_vector_data(vec_data):
-                        print(f"[!] Skipping invalid vector: {vec_data.get('vector_id', 'unknown')}")
+                        logger.warning(f"Skipping invalid vector: {vec_data.get('vector_id', 'unknown')}")
                         continue
                     if self._contains_external_reference(vec_data):
-                        print(f"[!] Skipping vector with external references: {vec_data.get('vector_id', 'unknown')}")
+                        logger.warning(f"Skipping vector with external references: {vec_data.get('vector_id', 'unknown')}")
                         continue
                     
                     vector = TestVector(
@@ -365,16 +382,16 @@ Output ONLY valid JSON. Do not include markdown code blocks or explanations outs
                     )
                     vectors.append(vector)
                 except Exception as e:
-                    print(f"[!] Error parsing vector: {e}")
+                    logger.warning(f"Error parsing vector: {e}")
                     continue
             
             return vectors
         except json.JSONDecodeError as e:
-            print(f"[!] JSON decode error: {e}")
-            print(f"[!] Response was: {response[:500]}...")
+            logger.error(f"JSON decode error: {e}")
+            logger.debug(f"Response was: {response[:500]}...")
             return []
         except Exception as e:
-            print(f"[!] Error parsing LLM response: {e}")
+            logger.error(f"Error parsing LLM response: {e}", exc_info=True)
             return []
     
     def _validate_vector_data(self, vec_data: Dict[str, Any]) -> bool:
@@ -457,10 +474,10 @@ Return the refined vectors in the same JSON format, fixing all issues found."""
             if refined_response:
                 refined_vectors = self.parse_llm_response(refined_response)
                 if refined_vectors:
-                    print(f"[+] Refined {len(refined_vectors)} vectors")
+                    logger.info(f"Refined {len(refined_vectors)} vectors")
                     return refined_vectors
         except Exception as e:
-            print(f"[!] Error refining vectors: {e}")
+            logger.error(f"Error refining vectors: {e}", exc_info=True)
         
         return vectors
     
@@ -476,7 +493,7 @@ Return the refined vectors in the same JSON format, fixing all issues found."""
             with open(module_path, 'r', encoding='utf-8') as f:
                 module_code = f.read()
         except Exception as e:
-            print(f"[!] Error reading module {module_name}: {e}")
+            logger.error(f"Error reading module {module_name}: {e}", exc_info=True)
             return []
         
         # Get uncovered functions
@@ -872,9 +889,20 @@ class Test{vector.vector_id.replace('_', '').title()}(unittest.TestCase):
         return test_code
     
     def _generate_c_code(self, vector: TestVector) -> str:
-        """Generate C test code using Unity framework"""
+        """Generate C test code using Unity or CMocka framework"""
         module_name = vector.module_name
         
+        # Check framework preference from config
+        test_framework = self.config.framework.test_framework.lower()
+        use_cmocka = test_framework == "cmocka" or "cmocka" in test_framework
+        
+        if use_cmocka:
+            return self._generate_cmocka_code(vector, module_name)
+        else:
+            return self._generate_unity_code(vector, module_name)
+    
+    def _generate_unity_code(self, vector: TestVector, module_name: str) -> str:
+        """Generate C test code using Unity framework"""
         test_code = f'''/*
  * {vector.description}
  *
@@ -969,6 +997,106 @@ void setUp(void) {{
             for postcondition in vector.postconditions:
                 test_code += f"    // Postcondition: {postcondition}\n"
         test_code += "}\n"
+        
+        return test_code
+    
+    def _generate_cmocka_code(self, vector: TestVector, module_name: str) -> str:
+        """Generate C test code using CMocka framework"""
+        test_code = f'''/*
+ * {vector.description}
+ *
+ * Vector ID: {vector.vector_id}
+ * Type: {vector.vector_type.value}
+ * Priority: {vector.priority.value}
+ */
+
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
+#include "{module_name}.h"
+
+static int setup(void **state) {{
+    // Setup before each test
+'''
+        
+        for precondition in vector.preconditions:
+            test_code += f"    // Precondition: {precondition}\n"
+        
+        if vector.setup_function:
+            test_code += f"    {vector.setup_function}();\n"
+        
+        test_code += "    return 0;\n}\n\n"
+        
+        test_code += f"static int teardown(void **state) {{\n"
+        if vector.teardown_function:
+            test_code += f"    {vector.teardown_function}();\n"
+        test_code += "    return 0;\n}\n\n"
+        
+        # Generate test function
+        test_func_name = f"test_{vector.vector_id.replace('-', '_')}"
+        test_code += f"static void {test_func_name}(void **state) {{\n"
+        test_code += f"    (void)state;  // Unused parameter\n"
+        test_code += f"    /*\n"
+        test_code += f"     * {vector.description}\n"
+        test_code += f"     * Coverage targets: {', '.join(vector.coverage_targets)}\n"
+        test_code += f"     */\n\n"
+        
+        # Add inputs
+        if vector.inputs:
+            test_code += "    // Inputs\n"
+            for key, value in vector.inputs.items():
+                if isinstance(value, str):
+                    test_code += f"    const char* {key} = \"{value}\";\n"
+                elif isinstance(value, int):
+                    test_code += f"    int {key} = {value};\n"
+                elif isinstance(value, float):
+                    test_code += f"    float {key} = {value}f;\n"
+                else:
+                    test_code += f"    // {key} = {value}\n"
+        
+        # Add test execution
+        test_code += "\n    // Execute test\n"
+        if vector.coverage_targets:
+            target = vector.coverage_targets[0]
+            if '.' in target:
+                # Struct method
+                struct_name, method_name = target.split('.', 1)
+                test_code += f"    {struct_name} obj;\n"
+                if vector.inputs:
+                    args = ', '.join(vector.inputs.keys())
+                    test_code += f"    // Initialize struct with: {args}\n"
+                    test_code += f"    {method_name}(&obj, {args});\n"
+                else:
+                    test_code += f"    {method_name}(&obj);\n"
+            else:
+                # Function call
+                if vector.inputs:
+                    args = ', '.join(vector.inputs.keys())
+                    test_code += f"    // result = {target}({args});\n"
+                else:
+                    test_code += f"    // result = {target}();\n"
+        
+        # Add assertions
+        if vector.expected_outputs:
+            test_code += "\n    // Assertions\n"
+            for key, value in vector.expected_outputs.items():
+                if isinstance(value, (int, float)):
+                    test_code += f"    assert_int_equal({key}, {value});\n"
+                elif isinstance(value, str):
+                    test_code += f"    assert_string_equal({key}, \"{value}\");\n"
+                else:
+                    test_code += f"    // assert({key} == {repr(value)});\n"
+        
+        test_code += "}\n\n"
+        
+        # Main function
+        test_code += f"int main(void) {{\n"
+        test_code += f"    const struct CMUnitTest tests[] = {{\n"
+        test_code += f"        cmocka_unit_test_setup_teardown({test_func_name}, setup, teardown),\n"
+        test_code += f"    }};\n"
+        test_code += f"    return cmocka_run_group_tests(tests, NULL, NULL);\n"
+        test_code += f"}}\n"
         
         return test_code
     
@@ -1159,4 +1287,4 @@ mod tests {{
             with open(test_file, 'w') as f:
                 f.write(test_code)
             
-            print(f"[+] Saved {len(vectors)} tests to {test_file}")
+            logger.info(f"Saved {len(vectors)} tests to {test_file}")

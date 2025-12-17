@@ -22,6 +22,9 @@ class TestVectorType(Enum):
     PERFORMANCE = "performance"
     SECURITY = "security"
     COMPATIBILITY = "compatibility"
+    
+    # Prevent pytest from collecting this as a test class
+    __test__ = False
 
 
 class TestPriority(Enum):
@@ -30,11 +33,17 @@ class TestPriority(Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
+    
+    # Prevent pytest from collecting this as a test class
+    __test__ = False
 
 
 @dataclass
 class TestVector:
     """Represents a single test vector"""
+    
+    # Prevent pytest from collecting this as a test class
+    __test__ = False
     
     # Identification
     vector_id: str

@@ -4,10 +4,20 @@ Command-line interface for Unified Test Harness
 """
 
 import sys
+import json
+import logging
 from pathlib import Path
 from .harness_runner import TestHarnessRunner
 from .config import HarnessConfig
 from .language_parser import LanguageParser
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -83,7 +93,45 @@ Examples:
     parser.add_argument("--coverage-threshold", type=float, default=0.8,
                        help="Coverage threshold (default: 0.8)")
     
+    # Configuration file support
+    parser.add_argument("--config", type=Path, default=None,
+                       help="Path to JSON configuration file (overrides command-line arguments)")
+    
     args = parser.parse_args()
+    
+    # Load configuration from file if provided
+    config_data = {}
+    if args.config:
+        config_path = Path(args.config).resolve()
+        if not config_path.exists():
+            logger.error(f"Configuration file not found: {config_path}")
+            sys.exit(1)
+        try:
+            with open(config_path, 'r') as f:
+                config_data = json.load(f)
+            logger.info(f"Loaded configuration from: {config_path}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in configuration file: {e}")
+            sys.exit(1)
+        except Exception as e:
+            logger.error(f"Error reading configuration file: {e}")
+            sys.exit(1)
+    
+    # Override command-line arguments with config file values
+    if config_data:
+        args.source_root = Path(config_data.get('source_root', args.source_root))
+        args.test_dir = Path(config_data.get('test_dir')) if config_data.get('test_dir') else args.test_dir
+        args.output_dir = Path(config_data.get('output_dir')) if config_data.get('output_dir') else args.output_dir
+        args.project_type = config_data.get('project_type', args.project_type)
+        args.language = config_data.get('language', args.language)
+        args.use_llm = config_data.get('llm_enabled', args.use_llm)
+        args.llm_provider = config_data.get('llm_provider', args.llm_provider)
+        args.llm_model = config_data.get('llm_model', args.llm_model)
+        args.batch_size = config_data.get('batch_size', args.batch_size)
+        args.coverage_threshold = config_data.get('coverage_threshold', args.coverage_threshold)
+        args.no_vector_db = not config_data.get('use_vector_db', not args.no_vector_db)
+        if 'modules' in config_data:
+            args.modules = config_data['modules']
     
     # Determine paths
     source_root = args.source_root.resolve()
@@ -93,7 +141,7 @@ Examples:
     # Auto-detect language if not specified
     language = args.language
     if not language:
-        parser = LanguageParser()
+        lang_parser = LanguageParser()
         # Check for common files
         if (source_root / "Cargo.toml").exists():
             language = "rust"
@@ -120,8 +168,8 @@ Examples:
             else:
                 project_type = "standard"
     
-    print(f"[*] Detected language: {language}")
-    print(f"[*] Using project type: {project_type}")
+    logger.info(f"Detected language: {language}")
+    logger.info(f"Using project type: {project_type}")
     
     # Create configuration
     config = HarnessConfig.create_for_project(source_root, project_type, language)
@@ -157,20 +205,18 @@ Examples:
                 focus_modules=args.modules,
                 initialize=args.init
             )
-            print("\n" + "=" * 70)
-            print("Test Harness Completed Successfully!")
-            print("=" * 70)
-            print(f"Coverage: {results['coverage_report'].get('coverage_percentage', 0):.2f}%")
-            print(f"Generated vectors: {len(results['generated_vectors'])}")
-            print(f"Results saved to: {config.output_dir}")
-            print("=" * 70)
+            logger.info("\n" + "=" * 70)
+            logger.info("Test Harness Completed Successfully!")
+            logger.info("=" * 70)
+            logger.info(f"Coverage: {results['coverage_report'].get('coverage_percentage', 0):.2f}%")
+            logger.info(f"Generated vectors: {len(results['generated_vectors'])}")
+            logger.info(f"Results saved to: {config.output_dir}")
+            logger.info("=" * 70)
     except KeyboardInterrupt:
-        print("\n[!] Interrupted by user")
+        logger.warning("\nInterrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\n[!] Error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"\nError: {e}", exc_info=True)
         sys.exit(1)
 
 

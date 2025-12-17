@@ -8,6 +8,7 @@ Supports Python, C, and Rust.
 
 import ast
 import hashlib
+import logging
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
@@ -15,12 +16,16 @@ from collections import defaultdict
 
 from .language_parser import LanguageParser, Language
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
 try:
     import chromadb
     from chromadb.config import Settings
     CHROMADB_AVAILABLE = True
 except ImportError:
     CHROMADB_AVAILABLE = False
+    logger.warning("ChromaDB not available. Vector database features will be disabled. Install with: pip install chromadb")
 
 
 @dataclass
@@ -67,11 +72,21 @@ class CodeEmbedder:
         self.language_parser = LanguageParser()
         
         if CHROMADB_AVAILABLE and config.use_vector_db:
-            self._init_db()
+            try:
+                self._init_db()
+            except Exception as e:
+                logger.error(f"Failed to initialize vector database: {e}")
+                logger.warning("Continuing without vector database. Some features may be limited.")
+                self.client = None
+                self.collections = {}
+        elif not CHROMADB_AVAILABLE and config.use_vector_db:
+            logger.warning("ChromaDB not available but vector_db is enabled. Install with: pip install chromadb")
+            logger.warning("Continuing without vector database. Some features may be limited.")
     
     def _init_db(self):
         """Initialize ChromaDB client and collections."""
         if not CHROMADB_AVAILABLE:
+            logger.warning("ChromaDB not available. Install with: pip install chromadb")
             return
         
         self.db_path.mkdir(parents=True, exist_ok=True)
@@ -178,7 +193,7 @@ class CodeEmbedder:
             segments.append(module_segment)
             
         except Exception as e:
-            print(f"Error parsing {file_path}: {e}")
+            logger.warning(f"Error parsing {file_path}: {e}")
         
         return segments
     
@@ -249,10 +264,10 @@ class CodeEmbedder:
     def embed_codebase(self):
         """Embed entire codebase into vector database."""
         if not CHROMADB_AVAILABLE or not self.config.use_vector_db:
-            print("ChromaDB not available or disabled. Skipping embedding.")
+            logger.warning("ChromaDB not available or disabled. Skipping embedding.")
             return
         
-        print(f"[*] Embedding codebase from {self.config.source_root}...")
+        logger.info(f"Embedding codebase from {self.config.source_root}...")
         
         all_segments = []
         source_patterns = self.config.framework.source_patterns
@@ -275,15 +290,15 @@ class CodeEmbedder:
                     by_language[lang] = []
                 by_language[lang].append(src_file)
         
-        print(f"[*] Found {len(source_files)} source files")
+        logger.info(f"Found {len(source_files)} source files")
         for lang, files in by_language.items():
-            print(f"  - {lang.value}: {len(files)} files")
+            logger.info(f"  - {lang.value}: {len(files)} files")
         
         for src_file in source_files:
             segments = self._parse_source_file(src_file)
             all_segments.extend(segments)
         
-        print(f"[*] Extracted {len(all_segments)} code segments")
+        logger.info(f"Extracted {len(all_segments)} code segments")
         
         # Group by type and embed
         by_type = defaultdict(list)
@@ -309,7 +324,7 @@ class CodeEmbedder:
             
             collection = self.collections[collection_name]
             
-            print(f"[*] Embedding {len(segments)} {seg_type} segments...")
+            logger.info(f"Embedding {len(segments)} {seg_type} segments...")
             
             ids = []
             embeddings = []
@@ -344,17 +359,17 @@ class CodeEmbedder:
                     documents=batch_documents
                 )
             
-            print(f"[+] Embedded {len(segments)} {seg_type} segments")
+            logger.info(f"Embedded {len(segments)} {seg_type} segments")
         
-        print(f"[+] Codebase embedding complete! Total segments: {len(all_segments)}")
+        logger.info(f"Codebase embedding complete! Total segments: {len(all_segments)}")
     
     def embed_existing_tests(self):
         """Embed existing test files as templates."""
         if not CHROMADB_AVAILABLE or not self.config.use_vector_db:
-            print("ChromaDB not available or disabled. Skipping test embedding.")
+            logger.warning("ChromaDB not available or disabled. Skipping test embedding.")
             return
         
-        print(f"[*] Embedding test templates from {self.config.test_dir}...")
+        logger.info(f"Embedding test templates from {self.config.test_dir}...")
         
         test_patterns = self.config.framework.test_patterns
         test_files = set()
@@ -364,7 +379,7 @@ class CodeEmbedder:
                 if test_file.suffix == ".py":
                     test_files.add(test_file)
         
-        print(f"[*] Found {len(test_files)} test files")
+        logger.info(f"Found {len(test_files)} test files")
         
         templates = []
         
@@ -490,9 +505,9 @@ class CodeEmbedder:
                         templates.append(template)
             
             except Exception as e:
-                print(f"Error parsing {test_file}: {e}")
+                logger.warning(f"Error parsing {test_file}: {e}")
         
-        print(f"[*] Extracted {len(templates)} test templates")
+        logger.info(f"Extracted {len(templates)} test templates")
         
         if templates and 'test_templates' in self.collections:
             collection = self.collections['test_templates']
@@ -520,7 +535,7 @@ class CodeEmbedder:
                 documents=documents
             )
             
-            print(f"[+] Embedded {len(templates)} test templates")
+            logger.info(f"Embedded {len(templates)} test templates")
     
     def _classify_test_type(self, test_code: str) -> str:
         """Classify test type based on code patterns."""

@@ -5,10 +5,14 @@ Supports parsing Python, C, and Rust code to extract functions, classes, and mod
 """
 
 import re
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class Language(Enum):
@@ -116,7 +120,7 @@ class LanguageParser:
                         docstring=ast.get_docstring(node)
                     ))
         except Exception as e:
-            print(f"Error parsing Python file {file_path}: {e}")
+            logger.warning(f"Error parsing Python file {file_path}: {e}")
         
         return elements
     
@@ -145,7 +149,8 @@ class LanguageParser:
             
             # Find functions
             for match in function_pattern.finditer(content):
-                func_name = match.group(1)
+                # Group 1 is return type, group 2 is function name
+                func_name = match.group(2) if len(match.groups()) > 1 else match.group(1)
                 start_pos = match.start()
                 start_line = content[:start_pos].count('\n') + 1
                 
@@ -174,6 +179,20 @@ class LanguageParser:
                     start_line=start_line,
                     end_line=end_line,
                     signature=signature
+                ))
+            
+            # Extract macros
+            for match in macro_pattern.finditer(content):
+                macro_name = match.group(1)
+                macro_start = match.start()
+                start_line = content[:macro_start].count('\n') + 1
+                
+                elements.append(CodeElement(
+                    name=macro_name,
+                    type='macro',
+                    file_path=str(file_path),
+                    start_line=start_line,
+                    end_line=start_line
                 ))
             
             # Find structs
@@ -205,7 +224,7 @@ class LanguageParser:
                 ))
         
         except Exception as e:
-            print(f"Error parsing C file {file_path}: {e}")
+            logger.warning(f"Error parsing C file {file_path}: {e}")
         
         return elements
     
@@ -409,7 +428,7 @@ class LanguageParser:
                 ))
         
         except Exception as e:
-            print(f"Error parsing Rust file {file_path}: {e}")
+            logger.warning(f"Error parsing Rust file {file_path}: {e}")
         
         return elements
     
@@ -460,6 +479,6 @@ class LanguageParser:
                 ))
         
         except Exception as e:
-            print(f"Error parsing C++ file {file_path}: {e}")
+            logger.warning(f"Error parsing C++ file {file_path}: {e}")
         
         return elements

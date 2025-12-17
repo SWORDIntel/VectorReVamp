@@ -7,10 +7,14 @@ LLM test generation quality.
 
 import ast
 import re
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from .language_parser import LanguageParser, Language, CodeElement
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -93,7 +97,7 @@ class CodeAnalyzer:
                     
                     return self._extract_python_function_info(node, content, file_path)
         except Exception as e:
-            print(f"Error analyzing Python function {function_name}: {e}")
+            logger.warning(f"Error analyzing Python function {function_name}: {e}")
         
         return None
     
@@ -272,7 +276,7 @@ class CodeAnalyzer:
                         end_line=end_line
                     )
         except Exception as e:
-            print(f"Error analyzing C function {function_name}: {e}")
+            logger.warning(f"Error analyzing C function {function_name}: {e}")
         
         return None
     
@@ -346,7 +350,7 @@ class CodeAnalyzer:
                         end_line=end_line
                     )
         except Exception as e:
-            print(f"Error analyzing Rust function {function_name}: {e}")
+            logger.warning(f"Error analyzing Rust function {function_name}: {e}")
         
         return None
     

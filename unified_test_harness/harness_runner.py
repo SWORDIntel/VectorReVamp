@@ -7,6 +7,8 @@ Framework-agnostic implementation.
 
 import subprocess
 import json
+import logging
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -16,6 +18,9 @@ from .coverage_analyzer import CoverageAnalyzer
 from .code_embedder import CodeEmbedder
 from .llm_generator import LLMTestGenerator
 from .config import HarnessConfig
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class TestHarnessRunner:
@@ -45,115 +50,142 @@ class TestHarnessRunner:
     
     def initialize(self):
         """Initialize vector database with codebase and tests"""
-        print("=" * 70)
-        print("Unified Test Harness - Initialization")
-        print("=" * 70)
+        logger.info("=" * 70)
+        logger.info("Unified Test Harness - Initialization")
+        logger.info("=" * 70)
         
-        if self.config.use_vector_db:
-            print("\n[1/2] Embedding codebase...")
-            self.code_embedder.embed_codebase()
+        try:
+            if self.config.use_vector_db:
+                logger.info("\n[1/2] Embedding codebase...")
+                self.code_embedder.embed_codebase()
+                
+                logger.info("\n[2/2] Embedding test templates...")
+                self.code_embedder.embed_existing_tests()
+            else:
+                logger.warning("\nVector database disabled, skipping embedding")
             
-            print("\n[2/2] Embedding test templates...")
-            self.code_embedder.embed_existing_tests()
-        else:
-            print("\n[!] Vector database disabled, skipping embedding")
-        
-        print("\n[+] Initialization complete!")
+            logger.info("\n[+] Initialization complete!")
+        except Exception as e:
+            logger.error(f"Initialization failed: {e}", exc_info=True)
+            raise
     
     def run_coverage_analysis(self) -> Dict[str, Any]:
         """Run coverage analysis"""
-        print("[*] Running coverage analysis...")
+        logger.info("Running coverage analysis...")
         
-        coverage_report = self.coverage_analyzer.run_coverage_analysis()
-        self.results['coverage_report'] = coverage_report
-        
-        if coverage_report:
-            coverage_pct = coverage_report.get('coverage_percentage', 0)
-            print(f"[+] Coverage: {coverage_pct:.2f}%")
-            print(f"[+] Total functions: {coverage_report.get('total_functions', 0)}")
-            print(f"[+] Covered functions: {coverage_report.get('covered_functions', 0)}")
-        
-        return coverage_report
+        try:
+            coverage_report = self.coverage_analyzer.run_coverage_analysis()
+            self.results['coverage_report'] = coverage_report
+            
+            if coverage_report:
+                coverage_pct = coverage_report.get('coverage_percentage', 0)
+                logger.info(f"Coverage: {coverage_pct:.2f}%")
+                logger.info(f"Total functions: {coverage_report.get('total_functions', 0)}")
+                logger.info(f"Covered functions: {coverage_report.get('covered_functions', 0)}")
+            
+            return coverage_report
+        except Exception as e:
+            logger.error(f"Coverage analysis failed: {e}", exc_info=True)
+            raise
     
     def identify_gaps(self) -> List[Dict[str, Any]]:
         """Identify coverage gaps"""
-        print("[*] Identifying coverage gaps...")
+        logger.info("Identifying coverage gaps...")
         
-        # Get existing test files
-        existing_tests = []
-        test_patterns = self.config.framework.test_patterns
-        for pattern in test_patterns:
-            for test_file in self.config.test_dir.glob(pattern):
-                existing_tests.append(test_file.stem)
-        
-        # Identify gaps
-        gaps = self.coverage_analyzer.identify_test_gaps(existing_tests)
-        
-        # Also identify zero-coverage modules
-        zero_coverage = self.coverage_analyzer.identify_zero_coverage_modules(
-            threshold=0.01
-        )
-        
-        for module_info in zero_coverage:
-            if module_info['module'] not in [g['module'] for g in gaps]:
-                gaps.append({
-                    'module': module_info['module'],
-                    'file_path': module_info['file_path'],
-                    'coverage': module_info['coverage'],
-                    'priority': module_info['priority'],
-                    'uncovered_functions': [],
-                    'type': 'zero_coverage'
-                })
-        
-        print(f"[+] Found {len(gaps)} coverage gaps")
-        return gaps
+        try:
+            # Get existing test files
+            existing_tests = []
+            test_patterns = self.config.framework.test_patterns
+            for pattern in test_patterns:
+                for test_file in self.config.test_dir.glob(pattern):
+                    existing_tests.append(test_file.stem)
+            
+            # Identify gaps
+            gaps = self.coverage_analyzer.identify_test_gaps(existing_tests)
+            
+            # Also identify zero-coverage modules
+            zero_coverage = self.coverage_analyzer.identify_zero_coverage_modules(
+                threshold=0.01
+            )
+            
+            for module_info in zero_coverage:
+                if module_info['module'] not in [g['module'] for g in gaps]:
+                    gaps.append({
+                        'module': module_info['module'],
+                        'file_path': module_info['file_path'],
+                        'coverage': module_info['coverage'],
+                        'priority': module_info['priority'],
+                        'uncovered_functions': [],
+                        'type': 'zero_coverage'
+                    })
+            
+            logger.info(f"Found {len(gaps)} coverage gaps")
+            return gaps
+        except Exception as e:
+            logger.error(f"Gap identification failed: {e}", exc_info=True)
+            raise
     
     def generate_test_vectors(self, gaps: List[Dict[str, Any]], use_llm: bool = None) -> List[TestVector]:
         """Generate test vectors for identified gaps"""
-        print("[*] Generating test vectors...")
+        logger.info("Generating test vectors...")
         
         if use_llm is None:
             use_llm = self.config.llm_enabled
         
         generated = []
         
-        # Process gaps in batches
-        batch_size = self.config.batch_size
-        for i in range(0, len(gaps), batch_size):
-            batch = gaps[i:i+batch_size]
-            print(f"[*] Processing batch {i//batch_size + 1} ({len(batch)} gaps)...")
+        try:
+            # Process gaps in batches
+            batch_size = self.config.batch_size
+            total_batches = (len(gaps) + batch_size - 1) // batch_size
             
-            for gap in batch:
-                module_name = gap['module']
-                priority = gap.get('priority', 'medium')
-                if module_name in getattr(self.config, "integration_targets", []):
-                    priority = "high"
+            for i in range(0, len(gaps), batch_size):
+                batch = gaps[i:i+batch_size]
+                batch_num = i//batch_size + 1
+                logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} gaps)...")
                 
-                vectors = self.llm_generator.generate_vectors_for_module(
-                    module_name,
-                    priority=priority
-                )
-                
-                for vector in vectors:
-                    self.registry.register(vector)
-                    generated.append(vector)
-        
-        self.results['generated_vectors'] = [v.to_dict() for v in generated]
-        print(f"[+] Generated {len(generated)} test vectors")
-        
-        return generated
+                for gap in batch:
+                    try:
+                        module_name = gap['module']
+                        priority = gap.get('priority', 'medium')
+                        if module_name in getattr(self.config, "integration_targets", []):
+                            priority = "high"
+                        
+                        vectors = self.llm_generator.generate_vectors_for_module(
+                            module_name,
+                            priority=priority
+                        )
+                        
+                        for vector in vectors:
+                            self.registry.register(vector)
+                            generated.append(vector)
+                    except Exception as e:
+                        logger.warning(f"Failed to generate vectors for {gap.get('module', 'unknown')}: {e}")
+                        continue
+            
+            self.results['generated_vectors'] = [v.to_dict() for v in generated]
+            logger.info(f"Generated {len(generated)} test vectors")
+            
+            return generated
+        except Exception as e:
+            logger.error(f"Test vector generation failed: {e}", exc_info=True)
+            raise
     
     def save_results(self):
         """Save test results"""
-        results_file = self.config.output_dir / "test_results.json"
-        with open(results_file, 'w') as f:
-            json.dump(self.results, f, indent=2)
-        
-        # Save registry
-        registry_file = self.config.output_dir / "test_vectors.json"
-        self.registry.save(registry_file)
-        
-        print(f"[+] Results saved to {self.config.output_dir}")
+        try:
+            results_file = self.config.output_dir / "test_results.json"
+            with open(results_file, 'w') as f:
+                json.dump(self.results, f, indent=2)
+            
+            # Save registry
+            registry_file = self.config.output_dir / "test_vectors.json"
+            self.registry.save(registry_file)
+            
+            logger.info(f"Results saved to {self.config.output_dir}")
+        except Exception as e:
+            logger.error(f"Failed to save results: {e}", exc_info=True)
+            raise
     
     def save_generated_tests(self):
         """Save generated test code"""
@@ -172,36 +204,44 @@ class TestHarnessRunner:
             focus_modules: Optional list of module names to focus on
             initialize: Whether to initialize vector database first
         """
-        print("[*] Starting unified test harness...")
+        logger.info("Starting unified test harness...")
+        start_time = time.time()
         
-        # Initialize if needed
-        if initialize and self.config.use_vector_db:
-            self.initialize()
-        
-        # 1. Run coverage analysis
-        coverage_report = self.run_coverage_analysis()
-        
-        # 2. Identify gaps
-        gaps = self.identify_gaps()
-        
-        # Filter by focus modules if specified
-        if focus_modules:
-            gaps = [g for g in gaps if g['module'] in focus_modules]
-            print(f"[+] Filtered to {len(gaps)} focus modules")
-        
-        # 3. Generate test vectors
-        vectors = self.generate_test_vectors(gaps, use_llm=use_llm)
-        
-        # 4. Save generated tests
-        self.save_generated_tests()
-        
-        # 5. Save results
-        self.save_results()
-        
-        # 6. Generate summary report
-        self._generate_summary_report(gaps)
-        
-        return self.results
+        try:
+            # Initialize if needed
+            if initialize and self.config.use_vector_db:
+                self.initialize()
+            
+            # 1. Run coverage analysis
+            coverage_report = self.run_coverage_analysis()
+            
+            # 2. Identify gaps
+            gaps = self.identify_gaps()
+            
+            # Filter by focus modules if specified
+            if focus_modules:
+                gaps = [g for g in gaps if g['module'] in focus_modules]
+                logger.info(f"Filtered to {len(gaps)} focus modules")
+            
+            # 3. Generate test vectors
+            vectors = self.generate_test_vectors(gaps, use_llm=use_llm)
+            
+            # 4. Save generated tests
+            self.save_generated_tests()
+            
+            # 5. Save results
+            self.save_results()
+            
+            # 6. Generate summary report
+            self._generate_summary_report(gaps)
+            
+            elapsed_time = time.time() - start_time
+            logger.info(f"Test harness completed in {elapsed_time:.2f} seconds")
+            
+            return self.results
+        except Exception as e:
+            logger.error(f"Test harness failed: {e}", exc_info=True)
+            raise
     
     def _generate_summary_report(self, gaps: List[Dict[str, Any]]):
         """Generate summary report"""
@@ -247,7 +287,7 @@ class TestHarnessRunner:
                     f.write(f"  - Priority: {vec.get('priority', 'medium')}\n")
                     f.write(f"  - Coverage Targets: {', '.join(vec.get('coverage_targets', []))}\n")
         
-        print(f"[+] Summary report saved to {report_file}")
+        logger.info(f"Summary report saved to {report_file}")
 
 
 def main():
@@ -308,9 +348,9 @@ def main():
         runner.save_results()
     else:
         results = runner.run_full_harness(use_llm=args.use_llm, initialize=args.init)
-        print("\n[+] Test harness completed!")
-        print(f"[+] Coverage: {results['coverage_report'].get('coverage_percentage', 0):.2f}%")
-        print(f"[+] Generated vectors: {len(results['generated_vectors'])}")
+        logger.info("\nTest harness completed!")
+        logger.info(f"Coverage: {results['coverage_report'].get('coverage_percentage', 0):.2f}%")
+        logger.info(f"Generated vectors: {len(results['generated_vectors'])}")
 
 
 if __name__ == "__main__":
