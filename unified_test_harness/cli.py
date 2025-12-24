@@ -20,6 +20,70 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _load_plugins_for_runner(runner, plugin_dirs):
+    """Load plugins for the test runner."""
+    try:
+        # Add default plugin directories
+        default_dirs = [
+            Path(__file__).parent / "plugins",
+            Path.cwd() / "plugins",
+        ]
+
+        # Add user-specified directories
+        for plugin_dir in plugin_dirs:
+            default_dirs.append(plugin_dir)
+
+        # Load plugins from each directory
+        for plugin_dir in default_dirs:
+            if plugin_dir.exists():
+                runner.plugin_loader.add_plugin_directory(plugin_dir)
+
+        # Discover and load plugins
+        plugin_files = runner.plugin_loader.discover_plugins()
+        for plugin_file in plugin_files:
+            runner.plugin_loader.load_plugin(plugin_file)
+
+        loaded_count = len(runner.plugin_registry.list_plugins())
+        logger.info(f"Loaded {loaded_count} plugins")
+
+    except Exception as e:
+        logger.error(f"Plugin loading failed: {e}")
+
+
+def list_available_plugins():
+    """List all available plugins."""
+    from .harness_runner import TestHarnessRunner
+    from .config import HarnessConfig
+
+    # Create a minimal config and runner for plugin access
+    config = HarnessConfig.create_minimal()
+    runner = TestHarnessRunner(config)
+
+    # Load plugins
+    _load_plugins_for_runner(runner, [])
+
+    # Display plugins
+    plugins = runner.plugin_registry.list_plugins()
+
+    if not plugins:
+        print("No plugins found.")
+        return
+
+    print("Available Plugins:")
+    print("=" * 50)
+
+    for plugin in plugins:
+        print(f"ID: {plugin['id']}")
+        print(f"Name: {plugin['name']}")
+        print(f"Type: {plugin['type']}")
+        print(f"Languages: {', '.join(plugin['languages'])}")
+        print(f"Frameworks: {', '.join(plugin['frameworks'])}")
+        print(f"Domains: {', '.join(plugin['domains'])}")
+        print(f"Quality Score: {plugin['quality_score']:.2f}")
+        print(f"Status: {'Loaded' if plugin['loaded'] else 'Not Loaded'}")
+        print("-" * 30)
+
+
 def main():
     """Main CLI entry point"""
     import argparse
@@ -64,7 +128,7 @@ Examples:
     # LLM options
     parser.add_argument("--use-llm", action="store_true",
                        help="Use LLM for test generation")
-    parser.add_argument("--llm-provider", type=str, 
+    parser.add_argument("--llm-provider", type=str,
                        choices=["openai", "anthropic"],
                        default="openai",
                        help="LLM provider (default: openai)")
@@ -72,6 +136,34 @@ Examples:
                        help="LLM API key (or set OPENAI_API_KEY/ANTHROPIC_API_KEY env var)")
     parser.add_argument("--llm-model", type=str, default="gpt-4",
                        help="LLM model name (default: gpt-4)")
+
+    # Template options
+    parser.add_argument("--use-templates", action="store_true", default=True,
+                       help="Use template-based generation (default: enabled)")
+    parser.add_argument("--no-templates", action="store_true",
+                       help="Disable template-based generation")
+    parser.add_argument("--template-quality-threshold", type=float, default=0.6,
+                       help="Minimum template quality score (default: 0.6)")
+    parser.add_argument("--save-templates", type=Path, default=None,
+                       help="Save extracted templates to JSON file")
+    parser.add_argument("--load-templates", type=Path, default=None,
+                       help="Load templates from JSON file")
+
+    # Parallel processing options
+    parser.add_argument("--parallel", action="store_true",
+                       help="Enable parallel test generation")
+    parser.add_argument("--max-workers", type=int, default=None,
+                       help="Maximum number of parallel workers (auto-detected if not specified)")
+
+    # Plugin system options
+    parser.add_argument("--plugin-dir", type=Path, action="append",
+                       help="Directory to search for plugins (can be specified multiple times)")
+    parser.add_argument("--list-plugins", action="store_true",
+                       help="List available plugins and exit")
+    parser.add_argument("--enable-plugins", action="store_true", default=True,
+                       help="Enable plugin system (default: enabled)")
+    parser.add_argument("--disable-plugins", action="store_true",
+                       help="Disable plugin system")
     
     # Actions
     parser.add_argument("--init", action="store_true",
@@ -98,7 +190,12 @@ Examples:
                        help="Path to JSON configuration file (overrides command-line arguments)")
     
     args = parser.parse_args()
-    
+
+    # Handle special commands
+    if args.list_plugins:
+        list_available_plugins()
+        return
+
     # Load configuration from file if provided
     config_data = {}
     if args.config:
@@ -132,6 +229,25 @@ Examples:
         args.no_vector_db = not config_data.get('use_vector_db', not args.no_vector_db)
         if 'modules' in config_data:
             args.modules = config_data['modules']
+
+        # Template configuration
+        args.use_templates = config_data.get('use_templates', args.use_templates)
+        args.template_quality_threshold = config_data.get('template_quality_threshold', args.template_quality_threshold)
+        if 'save_templates' in config_data:
+            args.save_templates = Path(config_data['save_templates'])
+        if 'load_templates' in config_data:
+            args.load_templates = Path(config_data['load_templates'])
+
+        # Parallel configuration
+        args.parallel = config_data.get('parallel', args.parallel)
+        args.max_workers = config_data.get('max_workers', args.max_workers)
+
+        # Plugin configuration
+        if 'plugin_dirs' in config_data:
+            args.plugin_dir = [Path(d) for d in config_data['plugin_dirs']]
+        args.enable_plugins = config_data.get('enable_plugins', args.enable_plugins)
+        if args.disable_plugins:
+            args.enable_plugins = False
     
     # Determine paths
     source_root = args.source_root.resolve()
@@ -185,7 +301,24 @@ Examples:
         config.llm_provider = args.llm_provider
         config.llm_api_key = args.llm_api_key
         config.llm_model = args.llm_model
-    
+
+    # Configure template engine
+    if args.no_templates:
+        args.use_templates = False
+    config.use_templates = args.use_templates
+    config.template_quality_threshold = args.template_quality_threshold
+
+    # Handle template file operations
+    if args.save_templates:
+        config.save_templates_path = args.save_templates
+    if args.load_templates:
+        config.load_templates_path = args.load_templates
+        if args.load_templates.exists():
+            logger.info(f"Loading templates from: {args.load_templates}")
+            runner.template_engine.load_templates(args.load_templates)
+        else:
+            logger.warning(f"Template file not found: {args.load_templates}")
+
     # Create runner
     runner = TestHarnessRunner(config)
     
@@ -200,16 +333,35 @@ Examples:
             runner.save_generated_tests()
             runner.save_results()
         else:
+            # Load plugins if enabled
+            if args.enable_plugins:
+                _load_plugins_for_runner(runner, args.plugin_dir or [])
+
             results = runner.run_full_harness(
                 use_llm=args.use_llm,
                 focus_modules=args.modules,
-                initialize=args.init
+                initialize=args.init,
+                use_parallel=args.parallel
             )
+            # Save templates if requested
+            if hasattr(config, 'save_templates_path') and config.save_templates_path:
+                logger.info(f"Saving templates to: {config.save_templates_path}")
+                runner.template_engine.save_templates(config.save_templates_path)
+
             logger.info("\n" + "=" * 70)
             logger.info("Test Harness Completed Successfully!")
             logger.info("=" * 70)
             logger.info(f"Coverage: {results['coverage_report'].get('coverage_percentage', 0):.2f}%")
             logger.info(f"Generated vectors: {len(results['generated_vectors'])}")
+
+            # Show generation statistics if available
+            if 'generation_stats' in results:
+                stats = results['generation_stats']
+                logger.info(f"Template-based: {stats.get('template_generated', 0)} "
+                          f"({stats.get('template_percentage', 0):.1f}%)")
+                logger.info(f"LLM-based: {stats.get('llm_generated', 0)} "
+                          f"({stats.get('llm_percentage', 0):.1f}%)")
+
             logger.info(f"Results saved to: {config.output_dir}")
             logger.info("=" * 70)
     except KeyboardInterrupt:

@@ -63,7 +63,13 @@ class HarnessConfig:
     # Output configuration
     save_generated_tests: bool = True
     test_output_format: str = "pytest"  # 'pytest', 'unittest', 'raw'
-    
+
+    # Template engine configuration
+    use_templates: bool = True
+    template_quality_threshold: float = 0.6
+    save_templates_path: Optional[Path] = None
+    load_templates_path: Optional[Path] = None
+
     # Advanced options
     parallel_generation: bool = False
     similarity_threshold: float = 0.7
