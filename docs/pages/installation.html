@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Installation - VectorReVamp Documentation</title>
+    <meta name="description" content="Install VectorReVamp - Intelligent Test Generation Framework">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/prism.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="site-header">
+        <div class="header-container">
+            <div class="logo-section">
+                <div class="logo">
+                    <i class="fas fa-flask"></i>
+                    <span class="logo-text">VectorReVamp</span>
+                </div>
+                <div class="tagline">Intelligent Test Generation</div>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="../index.html">Home</a></li>
+                    <li><a href="#" class="active">Installation</a></li>
+                    <li><a href="api.html">API</a></li>
+                    <li><a href="architecture.html">Architecture</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <div class="sidebar">
+                <nav class="sidebar-nav">
+                    <h3>Installation Guide</h3>
+                    <ul>
+                        <li><a href="#requirements">Requirements</a></li>
+                        <li><a href="#installation">Installation</a></li>
+                        <li><a href="#quick-start">Quick Start</a></li>
+                        <li><a href="#detailed-setup">Detailed Setup</a></li>
+                        <li><a href="#verification">Verification</a></li>
+                        <li><a href="#troubleshooting">Troubleshooting</a></li>
+                    </ul>
+                </nav>
+            </div>
+
+            <div class="content">
+                <div class="page-header">
+                    <h1><i class="fas fa-download"></i> Installation Guide</h1>
+                    <p class="lead">Get VectorReVamp up and running in your development environment</p>
+                </div>
+
+                <section id="requirements">
+                    <h2><i class="fas fa-list-check"></i> System Requirements</h2>
+                    <div class="requirements-grid">
+                        <div class="requirement-card">
+                            <h3><i class="fab fa-python"></i> Python</h3>
+                            <ul>
+                                <li>Python 3.8+</li>
+                                <li>Recommended: Python 3.10+</li>
+                            </ul>
+                        </div>
+
+                        <div class="requirement-card">
+                            <h3><i class="fas fa-memory"></i> Memory</h3>
+                            <ul>
+                                <li>Minimum: 4GB RAM</li>
+                                <li>Recommended: 8GB+ RAM</li>
+                                <li>For parallel processing: 16GB+ RAM</li>
+                            </ul>
+                        </div>
+
+                        <div class="requirement-card">
+                            <h3><i class="fas fa-hdd"></i> Storage</h3>
+                            <ul>
+                                <li>Minimum: 1GB free space</li>
+                                <li>Recommended: 5GB+ for templates and data</li>
+                            </ul>
+                        </div>
+
+                        <div class="requirement-card">
+                            <h3><i class="fab fa-linux"></i> Operating System</h3>
+                            <ul>
+                                <li>Linux (Ubuntu 18.04+)</li>
+                                <li>macOS (10.15+)</li>
+                                <li>Windows (10+ with WSL)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="installation">
+                    <h2><i class="fas fa-cog"></i> Installation</h2>
+
+                    <h3>Option 1: Install from PyPI</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Install VectorReVamp
+pip install vectorrevamp
+
+# Or install with all optional dependencies
+pip install vectorrevamp[all]</code></pre>
+                    </div>
+
+                    <h3>Option 2: Install from Source</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Clone the repository
+git clone https://github.com/SWORDIntel/DSMILSystem.git
+cd DSMILSystem/tools/VectorReVamp
+
+# Install in development mode
+pip install -e .
+
+# Or install with all optional dependencies
+pip install -e .[all]</code></pre>
+                    </div>
+
+                    <h3>Optional Dependencies</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># For full functionality
+pip install vectorrevamp[all]
+
+# Individual extras:
+# pip install vectorrevamp[analysis]     # Advanced static analysis
+# pip install vectorrevamp[parallel]     # Parallel processing
+# pip install vectorrevamp[plugins]      # Plugin system
+# pip install vectorrevamp[testing]      # Additional testing tools
+# pip install vectorrevamp[docs]         # Documentation generation</code></pre>
+                    </div>
+                </section>
+
+                <section id="quick-start">
+                    <h2><i class="fas fa-rocket"></i> Quick Start</h2>
+
+                    <h3>1. Generate Tests for a Python Module</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Generate tests for a Python file
+vectorrevamp generate my_module.py
+
+# Generate tests for an entire package
+vectorrevamp generate my_package/ --recursive
+
+# Specify output directory
+vectorrevamp generate my_module.py --output tests/</code></pre>
+                    </div>
+
+                    <h3>2. Generate Tests with Advanced Options</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Use templates and quality validation
+vectorrevamp generate my_module.py --use-templates --quality-threshold 0.8
+
+# Enable parallel processing
+vectorrevamp generate my_package/ --parallel --max-workers 4
+
+# Load custom plugins
+vectorrevamp generate my_module.py --plugin-path ./my_plugins/</code></pre>
+                    </div>
+
+                    <h3>3. View Generated Tests</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Run generated tests
+pytest tests/
+
+# View coverage report
+pytest tests/ --cov=my_module --cov-report=html
+open htmlcov/index.html</code></pre>
+                    </div>
+                </section>
+
+                <section id="detailed-setup">
+                    <h2><i class="fas fa-tools"></i> Detailed Setup</h2>
+
+                    <h3>Configuration File</h3>
+                    <p>Create a <code>vectorrevamp.json</code> configuration file:</p>
+                    <div class="code-block">
+                        <pre><code class="language-json">{
+  "language": "python",
+  "framework": "pytest",
+  "use_templates": true,
+  "template_quality_threshold": 0.7,
+  "parallel_enabled": true,
+  "max_workers": 4,
+  "output_directory": "tests/",
+  "plugin_paths": ["./plugins/"],
+  "coverage_targets": ["functions", "branches", "lines"],
+  "quality_checks": ["structural", "functional", "syntactic", "coverage"]
+}</code></pre>
+                    </div>
+
+                    <h3>Environment Variables</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Set environment variables
+export VECTORREVAMP_CONFIG=path/to/config.json
+export VECTORREVAMP_LOG_LEVEL=INFO
+export VECTORREVAMP_CACHE_DIR=~/.cache/vectorrevamp</code></pre>
+                    </div>
+
+                    <h3>Plugin Development Setup</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Create plugin directory structure
+mkdir -p my_plugins/language_plugins/
+mkdir -p my_plugins/framework_plugins/
+mkdir -p my_plugins/domain_plugins/
+
+# Create a custom language plugin
+cat > my_plugins/language_plugins/custom_lang.py << 'EOF'
+from vectorrevamp.plugin_system import LanguagePlugin
+
+class CustomLanguagePlugin(LanguagePlugin):
+    name = "custom_lang"
+    extensions = [".cl", ".custom"]
+
+    def analyze_file(self, file_path):
+        # Custom analysis logic
+        pass
+
+    def generate_test_template(self, function_info):
+        # Custom template generation
+        pass
+EOF</code></pre>
+                    </div>
+                </section>
+
+                <section id="verification">
+                    <h2><i class="fas fa-check-circle"></i> Verification</h2>
+
+                    <h3>Check Installation</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Verify installation
+vectorrevamp --version
+
+# Check available commands
+vectorrevamp --help
+
+# Test basic functionality
+vectorrevamp generate --help</code></pre>
+                    </div>
+
+                    <h3>Test Generation</h3>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># Create a simple test file
+cat > test_example.py << 'EOF'
+def add_numbers(a, b):
+    """Add two numbers together."""
+    return a + b
+
+def multiply_numbers(a, b):
+    """Multiply two numbers."""
+    return a * b
+EOF
+
+# Generate tests
+vectorrevamp generate test_example.py --output generated_tests/
+
+# Run generated tests
+pytest generated_tests/ -v</code></pre>
+                    </div>
+                </section>
+
+                <section id="troubleshooting">
+                    <h2><i class="fas fa-question-circle"></i> Troubleshooting</h2>
+
+                    <div class="troubleshooting-grid">
+                        <div class="troubleshoot-item">
+                            <h4>Import Error</h4>
+                            <p><strong>Issue:</strong> <code>ModuleNotFoundError: No module named 'vectorrevamp'</code></p>
+                            <p><strong>Solution:</strong> Ensure VectorReVamp is installed and Python path is correct.</p>
+                            <div class="code-block">
+                                <pre><code class="language-bash">pip install vectorrevamp
+python -c "import vectorrevamp; print('Import successful')"</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="troubleshoot-item">
+                            <h4>Permission Error</h4>
+                            <p><strong>Issue:</strong> Cannot write to output directory</p>
+                            <p><strong>Solution:</strong> Check permissions and create directory if needed.</p>
+                            <div class="code-block">
+                                <pre><code class="language-bash">mkdir -p output_directory/
+vectorrevamp generate input.py --output output_directory/</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="troubleshoot-item">
+                            <h4>Memory Error</h4>
+                            <p><strong>Issue:</strong> Out of memory during large codebase analysis</p>
+                            <p><strong>Solution:</strong> Reduce parallel workers or process in batches.</p>
+                            <div class="code-block">
+                                <pre><code class="language-bash">vectorrevamp generate large_codebase/ --max-workers 1
+# Or process specific files
+vectorrevamp generate specific_file.py</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="troubleshoot-item">
+                            <h4>Plugin Loading Error</h4>
+                            <p><strong>Issue:</strong> Custom plugins not loading</p>
+                            <p><strong>Solution:</strong> Check plugin path and ensure plugins inherit from base classes.</p>
+                            <div class="code-block">
+                                <pre><code class="language-bash">vectorrevamp generate --plugin-path ./plugins/ --debug
+# Check plugin inheritance
+python -c "from my_plugin import MyPlugin; print(MyPlugin.__bases__)"</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Getting Help</h3>
+                    <div class="help-section">
+                        <div class="help-item">
+                            <h4><i class="fab fa-github"></i> GitHub Issues</h4>
+                            <p>Report bugs and request features on GitHub.</p>
+                            <a href="https://github.com/SWORDIntel/DSMILSystem/issues" class="btn btn-sm">Report Issue</a>
+                        </div>
+
+                        <div class="help-item">
+                            <h4><i class="fas fa-book"></i> Documentation</h4>
+                            <p>Explore comprehensive documentation and examples.</p>
+                            <a href="api.html" class="btn btn-sm">API Docs</a>
+                        </div>
+
+                        <div class="help-item">
+                            <h4><i class="fas fa-users"></i> Community</h4>
+                            <p>Join discussions and get help from the community.</p>
+                            <a href="contributing.html" class="btn btn-sm">Contribute</a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-section">
+                <h4>VectorReVamp</h4>
+                <p>Intelligent Test Generation Framework</p>
+            </div>
+            <div class="footer-section">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="../index.html">Home</a></li>
+                    <li><a href="api.html">API Reference</a></li>
+                    <li><a href="architecture.html">Architecture</a></li>
+                    <li><a href="demonstration.html">Live Demo</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 VectorReVamp - Intelligent Test Generation Framework</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="../js/prism.js"></script>
+    <script src="../js/main.js"></script>
+</body>
+</html>

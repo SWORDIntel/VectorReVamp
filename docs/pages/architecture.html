@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture - VectorReVamp Documentation</title>
+    <meta name="description" content="VectorReVamp architecture and design principles">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/prism.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .architecture-diagram {
+            text-align: center;
+            margin: 3rem 0;
+            padding: 2rem;
+            background: var(--bg-alt);
+            border-radius: var(--radius-lg);
+        }
+
+        .architecture-diagram img {
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+        }
+
+        .component-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+
+        .component-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .component-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .component-icon {
+            font-size: 2rem;
+            color: var(--primary-color);
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-alt);
+            border-radius: var(--radius-md);
+        }
+
+        .component-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .component-description {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .component-features {
+            list-style: none;
+            padding: 0;
+        }
+
+        .component-features li {
+            padding: 0.25rem 0;
+            border-left: 3px solid var(--primary-color);
+            padding-left: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .flow-diagram {
+            background: var(--bg-alt);
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            margin: 3rem 0;
+            text-align: center;
+        }
+
+        .flow-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .flow-step {
+            flex: 1;
+            min-width: 200px;
+            text-align: center;
+        }
+
+        .flow-step-number {
+            width: 50px;
+            height: 50px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 1rem;
+        }
+
+        .flow-step h4 {
+            margin-bottom: 0.5rem;
+        }
+
+        .flow-arrows {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 1rem 0;
+        }
+
+        .flow-arrow {
+            flex: 1;
+            text-align: center;
+            color: var(--primary-color);
+            font-size: 1.5rem;
+        }
+
+        .data-flow {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .data-flow h3 {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .data-flow-diagram {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .data-source, .data-processor, .data-output {
+            background: var(--bg-alt);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            text-align: center;
+        }
+
+        .data-source {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .data-processor {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .data-output {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .quality-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 3rem 0;
+        }
+
+        .metric-card {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 1.1rem;
+            color: var(--text-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-description {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .dark-theme .component-card,
+        .dark-theme .metric-card {
+            background: var(--bg-alt);
+            border-color: var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="site-header">
+        <div class="header-container">
+            <div class="logo-section">
+                <div class="logo">
+                    <i class="fas fa-flask"></i>
+                    <span class="logo-text">VectorReVamp</span>
+                </div>
+                <div class="tagline">Intelligent Test Generation</div>
+            </div>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="../index.html">Home</a></li>
+                    <li><a href="installation.html">Installation</a></li>
+                    <li><a href="#" class="active">Architecture</a></li>
+                    <li><a href="api.html">API</a></li>
+                </ul>
+            </nav>
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-wrapper">
+            <div class="sidebar">
+                <nav class="sidebar-nav">
+                    <h3>Architecture</h3>
+                    <ul>
+                        <li><a href="#overview">Overview</a></li>
+                        <li><a href="#analysis">Static Analysis</a></li>
+                        <li><a href="#evolution">Template Evolution</a></li>
+                        <li><a href="#domain">Domain Intelligence</a></li>
+                        <li><a href="#parallel">Parallel Processing</a></li>
+                        <li><a href="#quality">Quality Validation</a></li>
+                        <li><a href="#plugins">Plugin System</a></li>
+                        <li><a href="#data-flow">Data Flow</a></li>
+                        <li><a href="#metrics">Quality Metrics</a></li>
+                    </ul>
+                </nav>
+            </div>
+
+            <div class="content">
+                <div class="page-header">
+                    <h1><i class="fas fa-sitemap"></i> Architecture Overview</h1>
+                    <p class="lead">Deep dive into VectorReVamp's intelligent test generation architecture</p>
+                </div>
+
+                <section id="overview">
+                    <h2><i class="fas fa-eye"></i> System Overview</h2>
+                    <p>VectorReVamp is an enterprise-grade intelligent test generation framework that combines deep static analysis, machine learning-driven template evolution, and domain-specific intelligence to generate comprehensive, high-quality test suites automatically.</p>
+
+                    <div class="architecture-diagram">
+                        <h3>High-Level Architecture</h3>
+                        <p><em>Architecture diagram would be displayed here</em></p>
+                        <div style="border: 2px dashed var(--border-color); padding: 3rem; border-radius: var(--radius-lg); color: var(--text-muted);">
+                            <i class="fas fa-diagram-project fa-3x"></i>
+                            <p style="margin-top: 1rem;">Interactive architecture diagram showing component relationships and data flow</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="analysis">
+                    <h2><i class="fas fa-search"></i> Advanced Static Analysis Engine</h2>
+                    <p>The static analysis engine performs comprehensive code analysis to identify test coverage gaps and generate intelligent test strategies.</p>
+
+                    <div class="component-grid">
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-code"></i>
+                                </div>
+                                <h3 class="component-title">Code Analyzer</h3>
+                            </div>
+                            <p class="component-description">Performs AST parsing and semantic analysis to understand code structure and dependencies.</p>
+                            <ul class="component-features">
+                                <li>Abstract Syntax Tree (AST) parsing</li>
+                                <li>Control flow graph generation</li>
+                                <li>Data flow analysis</li>
+                                <li>Dependency mapping</li>
+                                <li>Complexity metrics calculation</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-crosshairs"></i>
+                                </div>
+                                <h3 class="component-title">Coverage Analyzer</h3>
+                            </div>
+                            <p class="component-description">Identifies untested code paths and prioritizes test generation based on coverage gaps.</p>
+                            <ul class="component-features">
+                                <li>Path coverage analysis</li>
+                                <li>Branch coverage detection</li>
+                                <li>Edge case identification</li>
+                                <li>Risk assessment</li>
+                                <li>Priority scoring</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="evolution">
+                    <h2><i class="fas fa-dna"></i> Self-Improving Template Evolution System</h2>
+                    <p>The template evolution system continuously improves test generation quality through genetic algorithms and feedback loops.</p>
+
+                    <div class="component-grid">
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-brain"></i>
+                                </div>
+                                <h3 class="component-title">Template Engine</h3>
+                            </div>
+                            <p class="component-description">Manages test template storage, retrieval, and application with quality tracking.</p>
+                            <ul class="component-features">
+                                <li>Template storage and retrieval</li>
+                                <li>Dynamic template application</li>
+                                <li>Quality score tracking</li>
+                                <li>Usage statistics</li>
+                                <li>Template metadata management</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <h3 class="component-title">Evolution Engine</h3>
+                            </div>
+                            <p class="component-description">Applies genetic algorithms to evolve templates based on test execution feedback.</p>
+                            <ul class="component-features">
+                                <li>Genetic algorithm implementation</li>
+                                <li>Mutation and crossover operations</li>
+                                <li>Fitness evaluation</li>
+                                <li>Feedback loop integration</li>
+                                <li>Evolution statistics tracking</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="domain">
+                    <h2><i class="fas fa-compass"></i> Domain-Specific Intelligence Orchestrator</h2>
+                    <p>Intelligent orchestrator that selects optimal test generation strategies based on project type, language, and framework.</p>
+
+                    <div class="component-grid">
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-cogs"></i>
+                                </div>
+                                <h3 class="component-title">Strategy Selector</h3>
+                            </div>
+                            <p class="component-description">Analyzes project characteristics to select appropriate test generation strategies.</p>
+                            <ul class="component-features">
+                                <li>Project type detection</li>
+                                <li>Language-specific strategies</li>
+                                <li>Framework-aware generation</li>
+                                <li>Domain-specific rules</li>
+                                <li>Strategy optimization</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-balance-scale"></i>
+                                </div>
+                                <h3 class="component-title">Domain Intelligence</h3>
+                            </div>
+                            <p class="component-description">Applies domain-specific knowledge for enhanced test generation quality.</p>
+                            <ul class="component-features">
+                                <li>Security testing patterns</li>
+                                <li>Performance testing strategies</li>
+                                <li>API testing methodologies</li>
+                                <li>Database testing approaches</li>
+                                <li>UI/UX testing frameworks</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="parallel">
+                    <h2><i class="fas fa-tachometer-alt"></i> Resource-Aware Parallel Processing</h2>
+                    <p>Dynamic parallel processing system that scales workers based on system resources and optimizes test generation performance.</p>
+
+                    <div class="component-grid">
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-server"></i>
+                                </div>
+                                <h3 class="component-title">Resource Monitor</h3>
+                            </div>
+                            <p class="component-description">Monitors system resources and adjusts parallel processing parameters dynamically.</p>
+                            <ul class="component-features">
+                                <li>CPU usage monitoring</li>
+                                <li>Memory consumption tracking</li>
+                                <li>Disk I/O monitoring</li>
+                                <li>Network utilization</li>
+                                <li>Resource prediction</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-tasks"></i>
+                                </div>
+                                <h3 class="component-title">Parallel Engine</h3>
+                            </div>
+                            <p class="component-description">Manages parallel task execution with intelligent load balancing and failure handling.</p>
+                            <ul class="component-features">
+                                <li>Dynamic worker scaling</li>
+                                <li>Task queue management</li>
+                                <li>Load balancing algorithms</li>
+                                <li>Error recovery</li>
+                                <li>Performance optimization</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="quality">
+                    <h2><i class="fas fa-shield-alt"></i> Multi-Layered Quality Validation</h2>
+                    <p>Comprehensive quality validation system ensuring generated tests meet enterprise standards and provide reliable coverage.</p>
+
+                    <div class="component-grid">
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-check-circle"></i>
+                                </div>
+                                <h3 class="component-title">Quality Validator</h3>
+                            </div>
+                            <p class="component-description">Performs multi-layered validation of generated test code and templates.</p>
+                            <ul class="component-features">
+                                <li>Structural validation</li>
+                                <li>Functional correctness</li>
+                                <li>Syntactic validation</li>
+                                <li>Coverage potential analysis</li>
+                                <li>Complexity matching</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-award"></i>
+                                </div>
+                                <h3 class="component-title">Quality Metrics</h3>
+                            </div>
+                            <p class="component-description">Calculates comprehensive quality metrics for test assessment and improvement.</p>
+                            <ul class="component-features">
+                                <li>Test completeness scoring</li>
+                                <li>Maintainability metrics</li>
+                                <li>Performance benchmarks</li>
+                                <li>Reliability indicators</li>
+                                <li>Efficiency measurements</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="plugins">
+                    <h2><i class="fas fa-plug"></i> Extensible Plugin Architecture</h2>
+                    <p>Modular plugin system allowing custom language, framework, and domain-specific intelligence to be seamlessly integrated.</p>
+
+                    <div class="component-grid">
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-puzzle-piece"></i>
+                                </div>
+                                <h3 class="component-title">Plugin Registry</h3>
+                            </div>
+                            <p class="component-description">Manages plugin discovery, loading, and lifecycle with dependency resolution.</p>
+                            <ul class="component-features">
+                                <li>Plugin discovery and loading</li>
+                                <li>Dependency management</li>
+                                <li>Lifecycle management</li>
+                                <li>Version compatibility</li>
+                                <li>Error handling and recovery</li>
+                            </ul>
+                        </div>
+
+                        <div class="component-card">
+                            <div class="component-header">
+                                <div class="component-icon">
+                                    <i class="fas fa-code-branch"></i>
+                                </div>
+                                <h3 class="component-title">Plugin Types</h3>
+                            </div>
+                            <p class="component-description">Supports multiple plugin types for different aspects of test generation.</p>
+                            <ul class="component-features">
+                                <li>Language plugins</li>
+                                <li>Framework plugins</li>
+                                <li>Domain plugins</li>
+                                <li>Tool integration plugins</li>
+                                <li>Custom analysis plugins</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="data-flow">
+                    <h2><i class="fas fa-exchange-alt"></i> Data Flow Architecture</h2>
+                    <p>Understanding how data flows through VectorReVamp's intelligent processing pipeline.</p>
+
+                    <div class="data-flow">
+                        <h3>Data Processing Pipeline</h3>
+                        <div class="data-flow-diagram">
+                            <div class="data-source">
+                                <h4><i class="fas fa-file-code"></i> Source Code</h4>
+                                <p>Python, C, Rust files</p>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="data-processor">
+                                <h4><i class="fas fa-search"></i> Static Analysis</h4>
+                                <p>AST, Control Flow, Dependencies</p>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="data-processor">
+                                <h4><i class="fas fa-brain"></i> Intelligence Engine</h4>
+                                <p>Templates, Domain Rules, Quality Metrics</p>
+                            </div>
+                            <div class="flow-arrow">→</div>
+                            <div class="data-output">
+                                <h4><i class="fas fa-file-alt"></i> Generated Tests</h4>
+                                <p>Comprehensive test suites</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="metrics">
+                    <h2><i class="fas fa-chart-bar"></i> Quality Metrics & Performance</h2>
+                    <p>Comprehensive quality metrics that ensure generated tests meet enterprise standards.</p>
+
+                    <div class="quality-metrics">
+                        <div class="metric-card">
+                            <div class="metric-value">92.8%</div>
+                            <div class="metric-label">Average Coverage</div>
+                            <div class="metric-description">Target coverage achieved across test suites</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-value">4.27</div>
+                            <div class="metric-label">Tests/Second</div>
+                            <div class="metric-description">Generation throughput in parallel mode</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-value">100%</div>
+                            <div class="metric-label">Quality Pass Rate</div>
+                            <div class="metric-description">Generated tests passing quality validation</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-value">12.4s</div>
+                            <div class="metric-label">Average Generation Time</div>
+                            <div class="metric-description">Time to generate comprehensive test suites</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-container">
+            <div class="footer-section">
+                <h4>VectorReVamp</h4>
+                <p>Intelligent Test Generation Framework</p>
+            </div>
+            <div class="footer-section">
+                <h4>Documentation</h4>
+                <ul>
+                    <li><a href="../index.html">Home</a></li>
+                    <li><a href="installation.html">Installation</a></li>
+                    <li><a href="api.html">API Reference</a></li>
+                    <li><a href="demonstration.html">Live Demo</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 VectorReVamp - Intelligent Test Generation Framework</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="../js/prism.js"></script>
+    <script src="../js/main.js"></script>
+</body>
+</html>

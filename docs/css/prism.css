@@ -1,0 +1,319 @@
+/* PrismJS Theme for DSMIL Documentation */
+/* Based on One Dark theme with DSMIL color scheme */
+
+code[class*="language-"],
+pre[class*="language-"] {
+    color: #f8f8f2;
+    background: none;
+    text-shadow: 0 1px rgba(0, 0, 0, 0.3);
+    font-family: 'Fira Code', 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 0.875rem;
+    text-align: left;
+    white-space: pre;
+    word-spacing: normal;
+    word-break: normal;
+    word-wrap: normal;
+    line-height: 1.5;
+    tab-size: 4;
+    hyphens: none;
+}
+
+/* Code blocks */
+pre[class*="language-"] {
+    padding: 1rem;
+    margin: 0.5rem 0;
+    overflow: auto;
+    border-radius: 0.5rem;
+    background: #282a36;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Inline code */
+:not(pre) > code[class*="language-"] {
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.3rem;
+    background: #282a36;
+    color: #50fa7b;
+}
+
+/* Selection */
+pre[class*="language-"]::-moz-selection,
+pre[class*="language-"] ::-moz-selection,
+code[class*="language-"]::-moz-selection,
+code[class*="language-"] ::-moz-selection {
+    text-shadow: none;
+    background: rgba(45, 56, 85, 0.8);
+}
+
+pre[class*="language-"]::selection,
+pre[class*="language-"] ::selection,
+code[class*="language-"]::selection,
+code[class*="language-"] ::selection {
+    text-shadow: none;
+    background: rgba(45, 56, 85, 0.8);
+}
+
+/* Tokens */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+    color: #6272a4;
+}
+
+.token.punctuation {
+    color: #f8f8f2;
+}
+
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted {
+    color: #ff79c6;
+}
+
+.token.boolean,
+.token.number {
+    color: #bd93f9;
+}
+
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted {
+    color: #50fa7b;
+}
+
+.token.operator,
+.token.entity,
+.token.url,
+.token.variable {
+    color: #f8f8f2;
+}
+
+.token.atrule,
+.token.attr-value,
+.token.function,
+.token.class-name {
+    color: #f1fa8c;
+}
+
+.token.keyword {
+    color: #ff79c6;
+}
+
+.token.regex,
+.token.important {
+    color: #ffb86c;
+}
+
+/* Language-specific overrides */
+.language-python .token.function {
+    color: #50fa7b;
+}
+
+.language-c .token.function {
+    color: #50fa7b;
+}
+
+.language-cpp .token.function {
+    color: #50fa7b;
+}
+
+.language-javascript .token.function {
+    color: #50fa7b;
+}
+
+.language-bash .token.function {
+    color: #50fa7b;
+}
+
+/* Line highlighting */
+pre[class*="language-"].line-numbers {
+    position: relative;
+    padding-left: 3.8rem;
+    counter-reset: linenumber;
+}
+
+pre[class*="language-"].line-numbers > code {
+    position: relative;
+    white-space: inherit;
+}
+
+.line-numbers .line-numbers-rows {
+    position: absolute;
+    pointer-events: none;
+    top: 0;
+    font-size: 100%;
+    left: -3.8rem;
+    width: 3rem;
+    letter-spacing: -1px;
+    border-right: 1px solid #6272a4;
+    user-select: none;
+}
+
+.line-numbers-rows > span {
+    display: block;
+    counter-increment: linenumber;
+}
+
+.line-numbers-rows > span:before {
+    content: counter(linenumber);
+    color: #6272a4;
+    display: block;
+    padding-right: 0.8rem;
+    text-align: right;
+}
+
+/* Command line highlighting */
+pre[data-prefix] {
+    position: relative;
+    padding-left: 4rem;
+}
+
+pre[data-prefix]:before {
+    content: attr(data-prefix);
+    position: absolute;
+    left: 1rem;
+    top: 1rem;
+    color: #6272a4;
+    font-size: 0.875rem;
+    background: #282a36;
+    padding: 0 0.5rem;
+    border-radius: 0.25rem;
+}
+
+/* Copy button for code blocks */
+.code-block {
+    position: relative;
+}
+
+.copy-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0, 0, 0, 0.7);
+    color: #f8f8f2;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.code-block:hover .copy-button {
+    opacity: 1;
+}
+
+.copy-button:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.copy-button.copied {
+    background: #50fa7b;
+    color: #282a36;
+}
+
+/* Diff highlighting */
+pre[class*="language-diff"] {
+    background: #282a36;
+}
+
+.token.inserted {
+    background: rgba(80, 250, 123, 0.1);
+}
+
+.token.deleted {
+    background: rgba(255, 121, 198, 0.1);
+}
+
+/* JSON highlighting improvements */
+.language-json .token.property {
+    color: #ffb86c;
+}
+
+.language-json .token.string {
+    color: #50fa7b;
+}
+
+/* YAML highlighting */
+.language-yaml .token.key {
+    color: #ffb86c;
+}
+
+.language-yaml .token.value {
+    color: #50fa7b;
+}
+
+/* Dark theme support */
+body.dark-theme pre[class*="language-"],
+body.dark-theme code[class*="language-"] {
+    background: #1e1e2e;
+    color: #cdd6f4;
+}
+
+body.dark-theme .token.comment,
+body.dark-theme .token.prolog,
+body.dark-theme .token.doctype,
+body.dark-theme .token.cdata {
+    color: #6c7086;
+}
+
+body.dark-theme .token.punctuation {
+    color: #cdd6f4;
+}
+
+body.dark-theme .token.property,
+body.dark-theme .token.tag,
+body.dark-theme .token.constant,
+body.dark-theme .token.symbol,
+body.dark-theme .token.deleted {
+    color: #f38ba8;
+}
+
+body.dark-theme .token.boolean,
+body.dark-theme .token.number {
+    color: #cba6f7;
+}
+
+body.dark-theme .token.selector,
+body.dark-theme .token.attr-name,
+body.dark-theme .token.string,
+body.dark-theme .token.char,
+body.dark-theme .token.builtin,
+body.dark-theme .token.inserted {
+    color: #a6e3a1;
+}
+
+body.dark-theme .token.operator,
+body.dark-theme .token.entity,
+body.dark-theme .token.url,
+body.dark-theme .token.variable {
+    color: #cdd6f4;
+}
+
+body.dark-theme .token.atrule,
+body.dark-theme .token.attr-value,
+body.dark-theme .token.function,
+body.dark-theme .token.class-name {
+    color: #f9e2af;
+}
+
+body.dark-theme .token.keyword {
+    color: #f38ba8;
+}
+
+body.dark-theme .token.regex,
+body.dark-theme .token.important {
+    color: #fab387;
+}
+
+/* Line numbers for dark theme */
+body.dark-theme .line-numbers-rows > span:before {
+    color: #6c7086;
+}
