@@ -39,13 +39,51 @@
     --transition: all 0.3s ease;
 }
 
-/* Dark Theme Variables */
-body.dark-theme {
-    --text-color: #e2e8f0;
-    --text-muted: #a0aec0;
-    --bg-color: #1a202c;
-    --bg-alt: #2d3748;
-    --border-color: #4a5568;
+/* Default Dark Theme - VectorReVamp uses dark theme by default */
+:root {
+    --primary-color: #3b82f6;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    --info-color: #06b6d4;
+
+    --text-color: #f1f5f9;
+    --text-muted: #94a3b8;
+    --bg-color: #0f172a;
+    --bg-alt: #1e293b;
+    --border-color: #334155;
+
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --code-font: 'Fira Code', 'JetBrains Mono', 'Monaco', 'Consolas', 'Liberation Mono', monospace;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+
+    --transition: all 0.3s ease;
+}
+
+/* Light Theme Override */
+body.light-theme {
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+
+    --text-color: #212529;
+    --text-muted: #6c757d;
+    --bg-color: #ffffff;
+    --bg-alt: #f8f9fa;
+    --border-color: #dee2e6;
 }
 
 body {
@@ -159,13 +197,14 @@ a:hover {
 
 /* Header */
 .site-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: var(--text-color);
     padding: 1rem 0;
     position: sticky;
     top: 0;
     z-index: 1000;
     box-shadow: var(--shadow-lg);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .header-container {
@@ -175,6 +214,7 @@ a:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    position: relative;
 }
 
 .logo-section {
@@ -207,15 +247,19 @@ a:hover {
 }
 
 .main-nav a {
-    color: white;
+    color: var(--text-color);
     font-weight: 500;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-md);
     transition: var(--transition);
 }
 
 .main-nav a:hover,
 .main-nav a.active {
-    opacity: 1;
-    text-decoration: underline;
+    background: var(--bg-alt);
+    color: var(--primary-color);
+    text-decoration: none;
 }
 
 .header-actions {
@@ -775,4 +819,117 @@ code[class*="language-"] {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
+}
+
+/* Mobile Menu Styles */
+.mobile-menu-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+    margin-right: 1rem;
+}
+
+.mobile-menu-btn:hover {
+    background: var(--bg-alt);
+    color: var(--primary-color);
+}
+
+.main-nav.mobile-menu-open {
+    display: block !important;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-color);
+    border-top: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+}
+
+.main-nav.mobile-menu-open ul {
+    flex-direction: column;
+    padding: 1rem 0;
+}
+
+.main-nav.mobile-menu-open li {
+    margin: 0;
+    width: 100%;
+}
+
+.main-nav.mobile-menu-open a {
+    display: block;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.main-nav.mobile-menu-open a:hover {
+    background: var(--bg-alt);
+}
+
+.main-nav.mobile-menu-open a:last-child {
+    border-bottom: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    .main-nav {
+        display: none;
+    }
+
+    .main-nav ul {
+        padding: 0;
+        margin: 0;
+    }
+
+    .main-nav li {
+        margin: 0;
+    }
+
+    .main-nav a {
+        padding: 0.75rem 1rem;
+    }
+
+    .hero h1 {
+        font-size: 2.5rem;
+    }
+
+    .hero p {
+        font-size: 1.1rem;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .nav-categories {
+        grid-template-columns: 1fr;
+    }
+
+    .quick-nav h2 {
+        margin-bottom: 2rem;
+    }
+
+    .content-wrapper {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    .content {
+        padding: 0;
+    }
 }

@@ -20,19 +20,23 @@ function initializeTheme() {
     const themeToggle = document.getElementById('themeToggle');
     const body = document.body;
 
-    // Load saved theme
-    const savedTheme = localStorage.getItem('dsmil-theme');
-    if (savedTheme === 'dark') {
-        body.classList.add('dark-theme');
+    // Load saved theme - VectorReVamp defaults to dark theme
+    const savedTheme = localStorage.getItem('vectorrevamp-theme');
+    if (savedTheme === 'light') {
+        body.classList.add('light-theme');
+        updateThemeToggleIcon(false);
+    } else {
+        // Default to dark theme for VectorReVamp
+        body.classList.remove('light-theme');
         updateThemeToggleIcon(true);
     }
 
     // Theme toggle event listener
     if (themeToggle) {
         themeToggle.addEventListener('click', function() {
-            const isDark = body.classList.toggle('dark-theme');
-            localStorage.setItem('dsmil-theme', isDark ? 'dark' : 'light');
-            updateThemeToggleIcon(isDark);
+            const isLight = body.classList.toggle('light-theme');
+            localStorage.setItem('vectorrevamp-theme', isLight ? 'light' : 'dark');
+            updateThemeToggleIcon(!isLight);
         });
     }
 }
@@ -223,6 +227,15 @@ function initializeResponsiveFeatures() {
             const icon = this.querySelector('i');
             icon.className = mainNav.classList.contains('mobile-menu-open') ?
                 'fas fa-times' : 'fas fa-bars';
+        });
+
+        // Close mobile menu when clicking a link
+        const navLinks = mainNav.querySelectorAll('a');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                mainNav.classList.remove('mobile-menu-open');
+                mobileMenuBtn.querySelector('i').className = 'fas fa-bars';
+            });
         });
 
         // Close mobile menu when clicking outside
