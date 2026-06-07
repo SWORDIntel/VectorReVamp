@@ -41,16 +41,20 @@ class QihseDatabasePlugin(DomainPlugin):
     def generate_domain_tests(self, functions: List[Dict[str, Any]], domain: str) -> List[Dict[str, Any]]:
         tests = []
         if domain == "qihse":
-            for i in range(5000):
+            tests.append({
+                "name": "setup_db_fixture",
+                "code": "import pytest\nimport qihse\n\n@pytest.fixture(scope='session')\ndef db():\n    return qihse.Database()\n"
+            })
+            for i in range(50000):
                 # KV Test
                 tests.append({
                     "name": f"test_qihse_kv_store_e2e_{i}",
-                    "code": f"def test_qihse_kv_store_e2e_{i}():\n    import qihse\n    db = qihse.Database()\n    db.kv_set('test_key_{i}', 'test_val_{i}')\n    assert db.kv_get('test_key_{i}') == 'test_val_{i}'\n"
+                    "code": f"def test_qihse_kv_store_e2e_{i}(db):\n    db.kv_set('test_key_{i}', 'test_val_{i}')\n    assert db.kv_get('test_key_{i}') == 'test_val_{i}'\n"
                 })
                 # Trinary Search Test
                 tests.append({
                     "name": f"test_qihse_trinary_search_e2e_{i}",
-                    "code": f"def test_qihse_trinary_search_e2e_{i}():\n    import qihse\n    db = qihse.Database()\n    res = db.trinary_search([0.1, 0.5, -0.2], mode='QIHSE_VDB_QUERY_TRINARY_MAGNITUDE')\n    assert res is not None\n"
+                    "code": f"def test_qihse_trinary_search_e2e_{i}(db):\n    res = db.trinary_search([0.1, 0.5, -0.2], mode='QIHSE_VDB_QUERY_TRINARY_MAGNITUDE')\n    assert res is not None\n"
                 })
 
         return tests
